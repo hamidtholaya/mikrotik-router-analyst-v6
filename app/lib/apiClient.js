@@ -60,6 +60,8 @@ function formatUptime(seconds) {
 
 function getStoredCreds() {
   try {
+    const active = localStorage.getItem('mikrotik_creds_active');
+    if (active) return JSON.parse(active);
     const saved = localStorage.getItem('mikrotik_saved_creds');
     if (saved) return JSON.parse(saved);
     const session = localStorage.getItem('mikrotik_session');
@@ -110,9 +112,31 @@ async function handleNativeRequest(endpoint, options) {
         host: body.host,
         port: body.port,
         tls: body.tls,
+        password: body.password || '',
         timestamp: Date.now()
       };
       localStorage.setItem('mikrotik_session', JSON.stringify(session));
+      localStorage.setItem('mikrotik_creds_active', JSON.stringify({
+        host: body.host,
+        port: body.port,
+        user: body.user,
+        password: body.password || '',
+        tls: body.tls
+      }));
+
+      // Immediately attempt automatic initial FTP sync of user-manager/sqldb
+      try {
+        await MikroTikNative.syncDatabase({
+          host: body.host || '10.20.0.1',
+          ftpPort: 21,
+          user: body.user || 'admin',
+          password: body.password || '',
+          remotePath: 'user-manager/sqldb'
+        });
+      } catch (ftpErr) {
+        console.warn('Initial auto-sync warning:', ftpErr);
+      }
+
       return new Response(JSON.stringify({ success: true, session }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -157,7 +181,7 @@ async function handleNativeRequest(endpoint, options) {
       const creds = getStoredCreds();
       const res = await MikroTikNative.syncDatabase({
         host: creds.host || '10.20.0.1',
-        ftpPort: 21,
+        ftpPort: creds.ftpPort || 21,
         user: creds.user || 'admin',
         password: creds.password || '',
         remotePath: 'user-manager/sqldb'
@@ -173,6 +197,29 @@ async function handleNativeRequest(endpoint, options) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+  }
+
+  // 5b. Database Import: /api/userman/import
+  if (path === '/api/userman/import' && method === 'POST') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    const res = await MikroTikNative.importDatabase({
+      base64Data: body.base64Data,
+      filename: body.filename || 'userman_active.db'
+    });
+    return new Response(JSON.stringify(res), {
+      status: res.success ? 200 : 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // 5c. Database Export: /api/userman/export
+  if (path === '/api/userman/export') {
+    const filename = params.get('filename') || 'userman_active.db';
+    const res = await MikroTikNative.exportDatabase({ filename });
+    return new Response(JSON.stringify(res), {
+      status: res.success ? 200 : 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // 6. Backups: /api/userman/backup

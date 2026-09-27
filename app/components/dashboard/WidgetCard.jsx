@@ -340,15 +340,49 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
           background: 'rgba(244, 63, 94, 0.1)',
           border: '1px solid rgba(244, 63, 94, 0.25)',
           borderRadius: 'var(--radius-md)',
-          padding: '12px',
+          padding: '14px',
           color: 'var(--accent-rose)',
           fontSize: '0.85rem',
           display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
+          flexDirection: 'column',
+          gap: '10px'
         }}>
-          <AlertCircle style={{ width: '16px', height: '16px', shrink: 0 }} />
-          <div>{error}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+            <div>{error}</div>
+          </div>
+          {error.includes('does not exist') && (
+            <button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const res = await apiFetch('/api/userman/sync', { method: 'POST' });
+                  const d = await res.json();
+                  if (d.success) {
+                    runQuery();
+                  } else {
+                    setError(d.error || 'Failed to download sqldb from router.');
+                  }
+                } catch (e) {
+                  setError('Network sync error: ' + (e.message || e.toString()));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="btn btn-primary"
+              style={{
+                alignSelf: 'flex-start',
+                fontSize: '0.78rem',
+                padding: '6px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <RefreshCw style={{ width: '13px', height: '13px' }} />
+              Download & Sync Database Now
+            </button>
+          )}
         </div>
       )}
 

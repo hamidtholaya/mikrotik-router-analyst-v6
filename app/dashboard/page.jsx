@@ -6,7 +6,12 @@ import {
   LayoutDashboard, 
   Sparkles, 
   Loader2,
-  ArrowUpDown
+  ArrowUpDown,
+  Database,
+  Download,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import WidgetCard from '../components/dashboard/WidgetCard';
 import AddWidgetModal from '../components/dashboard/AddWidgetModal';
@@ -22,10 +27,50 @@ export default function DashboardPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeDb, setActiveDb] = useState(null);
+  const [syncingDb, setSyncingDb] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);
+  const [syncErr, setSyncErr] = useState(null);
 
   useEffect(() => {
     fetchDashboardConfig();
+    checkActiveDb();
   }, []);
+
+  const checkActiveDb = async () => {
+    try {
+      const res = await apiFetch('/api/userman/sync');
+      const data = await res.json();
+      if (data.activeDb) {
+        setActiveDb(data.activeDb);
+      }
+    } catch (e) {
+      console.error('Failed to check active db:', e);
+    }
+  };
+
+  const handleSyncDatabase = async () => {
+    setSyncingDb(true);
+    setSyncMsg(null);
+    setSyncErr(null);
+    try {
+      const res = await apiFetch('/api/userman/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setSyncMsg('Database downloaded successfully from router! Loading widgets...');
+        if (data.activeDb) setActiveDb(data.activeDb);
+        // Refresh dashboard items to re-run queries
+        await fetchDashboardConfig();
+        setTimeout(() => setSyncMsg(null), 4000);
+      } else {
+        setSyncErr(data.error || 'Failed to download database from router.');
+      }
+    } catch (err) {
+      setSyncErr('Network error: ' + (err.message || err.toString()));
+    } finally {
+      setSyncingDb(false);
+    }
+  };
 
   const fetchDashboardConfig = async () => {
     setLoading(true);
@@ -176,6 +221,95 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Database Status & Quick Sync Notification Banner */}
+      {syncMsg && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '14px 20px',
+          color: '#6ee7b7',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <CheckCircle2 style={{ width: '20px', height: '20px', color: 'var(--accent-emerald)', flexShrink: 0 }} />
+          <div style={{ fontSize: '0.9rem' }}>{syncMsg}</div>
+        </div>
+      )}
+
+      {syncErr && (
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.12)',
+          border: '1px solid rgba(244, 63, 94, 0.3)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '14px 20px',
+          color: '#fca5a5',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--accent-rose)', flexShrink: 0 }} />
+            <div style={{ fontSize: '0.88rem' }}>{syncErr}</div>
+          </div>
+          <button
+            onClick={handleSyncDatabase}
+            disabled={syncingDb}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+          >
+            Retry Sync
+          </button>
+        </div>
+      )}
+
+      {activeDb && !activeDb.exists && !syncMsg && (
+        <div className="glass-panel" style={{
+          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.1), rgba(6, 182, 212, 0.08))',
+          border: '1px solid rgba(244, 63, 94, 0.3)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '14px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '240px' }}>
+            <AlertCircle style={{ color: 'var(--accent-rose)', width: '24px', height: '24px', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: '600', color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                User Manager Database not synced yet
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                Download <code style={{ color: 'var(--accent-cyan)' }}>user-manager/sqldb</code> directly from your router into your phone to enable all widgets.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleSyncDatabase}
+            disabled={syncingDb}
+            className="btn btn-primary"
+            style={{ padding: '8px 18px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            {syncingDb ? (
+              <>
+                <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                Downloading sqldb...
+              </>
+            ) : (
+              <>
+                <Download style={{ width: '16px', height: '16px' }} />
+                Download Database Now
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Loading state */}
       {loading && (

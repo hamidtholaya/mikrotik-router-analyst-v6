@@ -322,6 +322,19 @@ public class MikroTikNativePlugin extends Plugin {
         }).start();
     }
 
+    private String readFtpResponse(BufferedReader reader) throws IOException {
+        String lastLine = "";
+        String line;
+        while ((line = reader.readLine()) != null) {
+            lastLine = line;
+            // RFC 959: Complete FTP reply has status code followed by space
+            if (line.length() >= 4 && Character.isDigit(line.charAt(0)) && Character.isDigit(line.charAt(1)) && Character.isDigit(line.charAt(2)) && line.charAt(3) == ' ') {
+                break;
+            }
+        }
+        return lastLine;
+    }
+
     @PluginMethod
     public void syncDatabase(PluginCall call) {
         String host = call.getString("host", "").trim();
@@ -342,35 +355,61 @@ public class MikroTikNativePlugin extends Plugin {
                 // Native Socket FTP implementation
                 Socket cmdSocket = new Socket(host, port);
                 cmdSocket.setSoTimeout(15000);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(cmdSocket.getInputStream()));
+                BufferedReader reader = new BufferedReader(new InputStreamReader(cmdSocket.getInputStream(), StandardCharsets.UTF_8));
                 PrintWriter writer = new PrintWriter(cmdSocket.getOutputStream(), true);
 
-                reader.readLine(); // 220
+                readFtpResponse(reader); // 220 Greeting
                 writer.println("USER " + user);
-                reader.readLine();
+                String userRes = readFtpResponse(reader); // 331
                 writer.println("PASS " + pass);
-                String loginRes = reader.readLine();
+                String loginRes = readFtpResponse(reader); // 230
                 if (loginRes == null || !loginRes.startsWith("230")) {
                     cmdSocket.close();
                     throw new Exception("FTP Login failed: " + loginRes);
                 }
 
                 writer.println("TYPE I");
-                reader.readLine();
+                readFtpResponse(reader); // 200
 
                 writer.println("PASV");
-                String pasvLine = reader.readLine();
+                String pasvLine = readFtpResponse(reader);
                 int sIdx = pasvLine.indexOf('(');
                 int eIdx = pasvLine.indexOf(')');
+                if (sIdx == -1 || eIdx == -1) {
+                    cmdSocket.close();
+                    throw new Exception("Unexpected PASV response from router: " + pasvLine);
+                }
+
                 String[] parts = pasvLine.substring(sIdx + 1, eIdx).split(",");
                 String dataHost = parts[0] + "." + parts[1] + "." + parts[2] + "." + parts[3];
                 int dataPort = (Integer.parseInt(parts[4]) << 8) + Integer.parseInt(parts[5]);
 
-                Socket dataSocket = new Socket(dataHost, dataPort);
-                dataSocket.setSoTimeout(20000);
+                // Try connecting to the control host first to properly handle NAT, DDNS, and WAN connections
+                Socket dataSocket = null;
+                try {
+                    dataSocket = new Socket(host, dataPort);
+                    dataSocket.setSoTimeout(25000);
+                } catch (Exception ex) {
+                    // Fallback to dataHost if connecting to control host fails
+                    dataSocket = new Socket(dataHost, dataPort);
+                    dataSocket.setSoTimeout(25000);
+                }
 
                 writer.println("RETR " + remotePath);
-                reader.readLine(); // 150
+                String retrRes = readFtpResponse(reader);
+
+                // Path fallback for MikroTik versions where path might be relative
+                if (retrRes != null && retrRes.startsWith("550") && remotePath.contains("/")) {
+                    String altPath = remotePath.substring(remotePath.lastIndexOf('/') + 1);
+                    writer.println("RETR " + altPath);
+                    retrRes = readFtpResponse(reader);
+                }
+
+                if (retrRes != null && !retrRes.startsWith("150") && !retrRes.startsWith("125")) {
+                    dataSocket.close();
+                    cmdSocket.close();
+                    throw new Exception("Router could not find file " + remotePath + ": " + retrRes);
+                }
 
                 try (InputStream in = dataSocket.getInputStream();
                      FileOutputStream fos = new FileOutputStream(targetFile)) {
@@ -382,7 +421,7 @@ public class MikroTikNativePlugin extends Plugin {
                     fos.flush();
                 }
                 dataSocket.close();
-                reader.readLine(); // 226
+                readFtpResponse(reader); // 226 Transfer complete
 
                 writer.println("QUIT");
                 cmdSocket.close();
@@ -408,6 +447,71 @@ public class MikroTikNativePlugin extends Plugin {
                 call.resolve(ret);
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void importDatabase(PluginCall call) {
+        String base64Data = call.getString("base64Data", "");
+        String filename = call.getString("filename", "userman_active.db");
+
+        if (base64Data.isEmpty()) {
+            call.reject("Base64 database content is required.");
+            return;
+        }
+
+        try {
+            byte[] bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT);
+            File targetFile = new File(getDataDir(), filename);
+            try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+                fos.write(bytes);
+                fos.flush();
+            }
+
+            JSObject activeDb = new JSObject();
+            activeDb.put("exists", true);
+            activeDb.put("filename", filename);
+            activeDb.put("sizeBytes", targetFile.length());
+            activeDb.put("sizeFormatted", formatBytes(targetFile.length()));
+            activeDb.put("lastModified", new Date(targetFile.lastModified()).toString());
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            ret.put("message", "Successfully imported database file into mobile app.");
+            ret.put("activeDb", activeDb);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Import error: ", e);
+            call.reject("Failed to import database: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void exportDatabase(PluginCall call) {
+        String filename = call.getString("filename", "userman_active.db");
+        File file = new File(getDataDir(), filename);
+        if (!file.exists()) {
+            file = new File(getBackupsDir(), filename);
+        }
+        if (!file.exists()) {
+            call.reject("Database file " + filename + " does not exist.");
+            return;
+        }
+
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] bytes = new byte[(int) file.length()];
+            int read = fis.read(bytes);
+            String base64 = android.util.Base64.encodeToString(bytes, 0, read, android.util.Base64.NO_WRAP);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            ret.put("filename", file.getName());
+            ret.put("base64", base64);
+            ret.put("sizeBytes", file.length());
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Export error: ", e);
+            call.reject("Failed to export database: " + e.getMessage());
+        }
     }
 
     @PluginMethod

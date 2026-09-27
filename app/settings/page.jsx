@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Database, 
   RefreshCw, 
@@ -15,7 +15,9 @@ import {
   ShieldCheck,
   Smartphone,
   Globe,
-  Wifi
+  Wifi,
+  Upload,
+  FolderDown
 } from 'lucide-react';
 import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
 
@@ -25,11 +27,13 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [backendUrl, setBackendUrlState] = useState('');
   const [isMobileEnv, setIsMobileEnv] = useState(false);
   const [urlSavedMessage, setUrlSavedMessage] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -106,6 +110,78 @@ export default function SettingsPage() {
       setError('Network error creating backup.');
     } finally {
       setBackingUp(false);
+    }
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    setImporting(true);
+    setMessage(null);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const resultStr = reader.result;
+        const base64Data = resultStr.split(',')[1];
+        const res = await apiFetch('/api/userman/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64Data,
+            filename: 'userman_active.db'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setMessage(`Successfully imported "${file.name}" as active database!`);
+          if (data.activeDb) setActiveDb(data.activeDb);
+        } else {
+          setError(data.error || 'Failed to import database file.');
+        }
+      } catch (err) {
+        setError('Error reading or saving file: ' + err.message);
+      } finally {
+        setImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setError('Failed to read file from device storage.');
+      setImporting(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleExportFile = async (filename = 'userman_active.db') => {
+    try {
+      const res = await apiFetch(`/api/userman/export?filename=${encodeURIComponent(filename)}`);
+      const data = await res.json();
+      if (data.success && data.base64) {
+        const byteCharacters = atob(data.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename || filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setMessage(`Exported ${filename} successfully!`);
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setError(data.error || 'Failed to export database.');
+      }
+    } catch (e) {
+      setError('Export failed: ' + e.message);
     }
   };
 
@@ -200,24 +276,62 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <button
-            onClick={handleReloadActiveDb}
-            disabled={syncing}
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: 'auto' }}
-          >
-            {syncing ? (
-              <>
-                <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
-                Downloading sqldb...
-              </>
-            ) : (
-              <>
-                <RefreshCw style={{ width: '16px', height: '16px' }} />
-                Reload & Replace Active sqldb
-              </>
-            )}
-          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            accept=".db,.sqlite,*"
+            style={{ display: 'none' }}
+          />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto' }}>
+            <button
+              onClick={handleReloadActiveDb}
+              disabled={syncing || importing}
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              {syncing ? (
+                <>
+                  <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                  Downloading sqldb via FTP...
+                </>
+              ) : (
+                <>
+                  <RefreshCw style={{ width: '16px', height: '16px' }} />
+                  Sync from Router (FTP)
+                </>
+              )}
+            </button>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing || syncing}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '8px 10px' }}
+                title="Select a .db or sqldb file from your phone storage"
+              >
+                {importing ? (
+                  <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Upload style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)' }} />
+                )}
+                Import .db
+              </button>
+
+              <button
+                onClick={() => handleExportFile('userman_active.db')}
+                disabled={!activeDb || !activeDb.exists}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '8px 10px' }}
+                title="Export active database to your phone storage"
+              >
+                <FolderDown style={{ width: '14px', height: '14px', color: 'var(--accent-emerald)' }} />
+                Export DB
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Timestamped Backup Card */}
@@ -231,7 +345,7 @@ export default function SettingsPage() {
           </div>
 
           <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Create point-in-time snapshot backups of <code style={{ color: 'var(--accent-purple)' }}>user-manager/sqldb</code> saved with date and time in the filename.
+            Create point-in-time snapshot backups of <code style={{ color: 'var(--accent-purple)' }}>user-manager/sqldb</code> saved on your phone.
           </p>
 
           <button
@@ -256,12 +370,30 @@ export default function SettingsPage() {
           {/* Backup History List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
             {backups.map((item, idx) => (
-              <div key={idx} className="glass-card" style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)' }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', color: '#fff' }}>{item.filename}</span>
+              <div key={idx} className="glass-card" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                  <FileText style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)', flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.filename}</span>
                 </div>
-                <div style={{ color: 'var(--text-dim)' }}>{item.sizeFormatted}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>{item.sizeFormatted}</span>
+                  <button
+                    onClick={() => handleExportFile(item.filename)}
+                    style={{
+                      background: 'rgba(6, 182, 212, 0.12)',
+                      border: '1px solid rgba(6, 182, 212, 0.3)',
+                      color: 'var(--accent-cyan)',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Export backup to phone"
+                  >
+                    <Download style={{ width: '12px', height: '12px' }} />
+                  </button>
+                </div>
               </div>
             ))}
 
