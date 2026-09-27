@@ -166,23 +166,37 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
     scales: item.chartType === 'pie' || item.chartType === 'doughnut' ? {} : {
       x: { 
         stacked: isStacked,
-        ticks: { color: 'var(--text-muted)' }, 
-        grid: { color: 'rgba(125,125,125,0.1)' } 
+        ticks: { 
+          color: 'var(--text-muted)',
+          autoSkip: true,
+          maxTicksLimit: 6,
+          maxRotation: 0,
+          font: { family: 'Outfit', size: 10 }
+        }, 
+        grid: { color: 'rgba(125,125,125,0.08)' } 
       },
       y: { 
         type: 'linear',
         display: true,
         position: 'left',
         stacked: isStacked,
-        ticks: { color: 'var(--text-muted)' }, 
-        grid: { color: 'rgba(125,125,125,0.1)' } 
+        ticks: { 
+          color: 'var(--text-muted)',
+          maxTicksLimit: 5,
+          font: { family: 'Outfit', size: 10 }
+        }, 
+        grid: { color: 'rgba(125,125,125,0.08)' } 
       },
       ...(hasDualAxis ? {
         y1: {
           type: 'linear',
           display: true,
           position: 'right',
-          ticks: { color: 'var(--accent-purple)' },
+          ticks: { 
+            color: 'var(--accent-purple)',
+            maxTicksLimit: 5,
+            font: { family: 'Outfit', size: 10 }
+          },
           grid: { drawOnChartArea: false }
         }
       } : {})
@@ -191,37 +205,39 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
 
   return (
     <div 
-      className="glass-panel" 
+      className={`glass-panel ${item.type === 'stat_card' ? 'stat-card-widget' : ''}`} 
       style={{
         ...getSizeStyle(item.size),
         borderRadius: 'var(--radius-lg)',
-        padding: '20px',
+        padding: item.type === 'stat_card' ? '14px 16px' : '18px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '14px',
-        position: 'relative'
+        gap: '12px',
+        position: 'relative',
+        minWidth: 0,
+        maxWidth: '100%'
       }}
     >
       
       {/* Widget Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {item.type === 'stat_card' && <Activity style={{ width: '18px', height: '18px', color: 'var(--accent-cyan)' }} />}
-          {item.type === 'table' && <TableIcon style={{ width: '18px', height: '18px', color: 'var(--accent-purple)' }} />}
-          {item.type === 'chart' && <BarChart3 style={{ width: '18px', height: '18px', color: 'var(--accent-emerald)' }} />}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+          {item.type === 'stat_card' && <Activity style={{ width: '18px', height: '18px', color: 'var(--accent-cyan)', flexShrink: 0 }} />}
+          {item.type === 'table' && <TableIcon style={{ width: '18px', height: '18px', color: 'var(--accent-purple)', flexShrink: 0 }} />}
+          {item.type === 'chart' && <BarChart3 style={{ width: '18px', height: '18px', color: 'var(--accent-emerald)', flexShrink: 0 }} />}
           
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-main)' }}>{item.name}</h3>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h3>
             {item.dbPath && item.dbPath !== 'data/userman_active.db' && (
-              <div style={{ fontSize: '0.7rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Database style={{ width: '10px', height: '10px' }} />
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <Database style={{ width: '10px', height: '10px', flexShrink: 0 }} />
                 {item.dbPath.split('\\').pop().split('/').pop()}
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           {/* Quick Reorder Arrow Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(125,125,125,0.08)', borderRadius: '6px', padding: '2px' }}>
             <button
