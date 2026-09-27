@@ -17,9 +17,11 @@ import {
   Activity,
   ArrowRight,
   Sparkles,
-  Save
+  Save,
+  Smartphone,
+  Sliders
 } from 'lucide-react';
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,9 +40,21 @@ export default function LoginPage() {
   const [connecting, setConnecting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [serverUrl, setServerUrl] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Load saved credentials ONLY if the user previously checked rememberMe
+  // Initialize mobile detection, backend URL, and saved credentials
   useEffect(() => {
+    const mobile = isNativeMobile();
+    setIsMobile(mobile);
+    const savedUrl = getApiBaseUrl();
+    if (savedUrl) {
+      setServerUrl(savedUrl);
+    } else if (mobile) {
+      setServerUrl('http://10.20.1.157:3000');
+      setApiBaseUrl('http://10.20.1.157:3000');
+    }
+
     try {
       const saved = localStorage.getItem('mikrotik_saved_creds');
       if (saved) {
@@ -59,6 +73,12 @@ export default function LoginPage() {
     }
   }, []);
 
+  const handleServerUrlChange = (e) => {
+    const val = e.target.value;
+    setServerUrl(val);
+    setApiBaseUrl(val);
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -72,6 +92,27 @@ export default function LoginPage() {
     setTesting(true);
     setTestResult(null);
     setErrorMsg(null);
+
+    // If Demo Mode is enabled, simulate instantaneous connection client-side
+    if (formData.demo) {
+      setTimeout(() => {
+        setTestResult({
+          success: true,
+          latency: '8ms',
+          routerInfo: {
+            identity: 'MikroTik-CCR1036 (Demo)',
+            model: 'CCR1036-12G-4S',
+            version: '6.48.7 (stable)',
+            cpuLoad: '4%',
+            uptime: '28d 14:10:02',
+            freeMemory: '3840 MB',
+            time: new Date().toLocaleString()
+          }
+        });
+        setTesting(false);
+      }, 350);
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/mikrotik/test', {
@@ -87,7 +128,7 @@ export default function LoginPage() {
         setErrorMsg(data.error || 'Connection failed.');
       }
     } catch (err) {
-      setErrorMsg('Failed to reach backend test server.');
+      setErrorMsg(`Failed to reach backend test server at ${serverUrl || 'local'}. Ensure your PC is running and reachable on Wi-Fi.`);
     } finally {
       setTesting(false);
     }
@@ -97,6 +138,19 @@ export default function LoginPage() {
     e.preventDefault();
     setConnecting(true);
     setErrorMsg(null);
+
+    // Immediate Demo Mode bypass
+    if (formData.demo) {
+      localStorage.setItem('mikrotik_session', JSON.stringify({
+        user: 'demo-admin',
+        host: '10.20.0.1 (Demo)',
+        isDemo: true,
+        timestamp: Date.now()
+      }));
+      router.push('/dashboard');
+      router.refresh();
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/auth/login', {
@@ -131,7 +185,7 @@ export default function LoginPage() {
         setErrorMsg(data.error || 'Failed to authenticate with router.');
       }
     } catch (err) {
-      setErrorMsg('Network error during authentication.');
+      setErrorMsg(`Network error connecting to ${serverUrl || 'backend server'}. Check PC IP and Wi-Fi connection.`);
     } finally {
       setConnecting(false);
     }
@@ -178,6 +232,42 @@ export default function LoginPage() {
 
           <form onSubmit={handleConnect} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             
+            {/* Backend Server / Relay Endpoint (Required for Mobile APK) */}
+            <div style={{
+              background: 'rgba(6, 182, 212, 0.06)',
+              border: '1px solid rgba(6, 182, 212, 0.2)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Smartphone style={{ width: '15px', height: '15px', color: 'var(--accent-emerald)' }} />
+                  Backend Server Host (PC IP)
+                </label>
+                <span className={`badge ${isMobile ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                  {isMobile ? 'Android App' : 'Browser'}
+                </span>
+              </div>
+              <input 
+                type="text"
+                value={serverUrl}
+                onChange={handleServerUrlChange}
+                placeholder="http://10.20.1.157:3000"
+                className="input-field"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', padding: '8px 12px' }}
+              />
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', lineHeight: 1.35 }}>
+                {isMobile ? (
+                  <>Point to your PC running Next.js on Wi-Fi (<strong style={{ color: 'var(--accent-cyan)' }}>http://10.20.1.157:3000</strong>).</>
+                ) : (
+                  <>Leave blank for local browser (relative paths), or specify server address.</>
+                )}
+              </span>
+            </div>
+
             {/* Host & Port grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
               <div className="input-group">
