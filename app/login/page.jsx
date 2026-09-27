@@ -126,10 +126,10 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '28px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '20px', alignItems: 'start' }}>
         
         {/* Connection Form Card */}
-        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '28px' }}>
+        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '24px 20px' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
             <Shield style={{ color: 'var(--accent-cyan)', width: '22px', height: '22px' }} />
@@ -353,7 +353,7 @@ export default function LoginPage() {
 
                   <div className="glass-card" style={{ padding: '12px' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Uptime</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#fff' }}>{testResult.routerInfo.uptime}</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-main)' }}>{testResult.routerInfo.uptime}</div>
                   </div>
                 </div>
               </div>
@@ -370,7 +370,7 @@ export default function LoginPage() {
 
           {/* Quick Tips Panel */}
           <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            <div style={{ fontWeight: '600', color: '#fff', marginBottom: '8px' }}>MikroTik API Setup Requirements:</div>
+            <div style={{ fontWeight: '600', color: 'var(--text-main)', marginBottom: '8px' }}>MikroTik API Setup Requirements:</div>
             <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <li>Ensure API service is enabled in RouterOS (WinBox: <code>IP &gt; Services &gt; api</code>).</li>
               <li>Default plain API port is <strong>8728</strong>. SSL API port is <strong>8729</strong>.</li>

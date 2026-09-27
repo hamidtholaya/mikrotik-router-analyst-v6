@@ -132,6 +132,7 @@ a {
   border-bottom: 2px solid var(--border-color);
   font-size: 0.88rem;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .data-table td {
@@ -140,6 +141,7 @@ a {
   font-weight: 500;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.92rem;
+  white-space: nowrap;
 }
 
 .data-table tbody tr:nth-child(even) {
@@ -152,8 +154,8 @@ a {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-primary);
@@ -215,6 +217,8 @@ a {
   cursor: pointer;
   border: none;
   transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .btn-primary {
@@ -296,4 +300,52 @@ a {
   background: rgba(244, 63, 94, 0.15);
   color: var(--accent-rose);
   border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+/* ========================================================= */
+/* Responsive & Mobile-First Utilities */
+/* ========================================================= */
+
+.desktop-only {
+  display: flex !important;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: flex !important;
+  }
+
+  main {
+    padding: 16px 12px 76px 12px !important; /* Extra bottom padding for mobile bar */
+  }
+
+  /* Make grid containers stack cleanly on smaller screens */
+  .responsive-grid-12 {
+    grid-column: span 12 !important;
+  }
+
+  /* Modal responsiveness */
+  .modal-container {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    padding: 16px !important;
+    max-height: 90vh !important;
+  }
+
+  /* Responsive Dashboard Grid for Phones */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .dashboard-grid > div {
+    grid-column: span 1 !important;
+  }
 }

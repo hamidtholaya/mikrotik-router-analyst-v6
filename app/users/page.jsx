@@ -566,24 +566,25 @@ export default function UsersPage() {
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.75)',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           zIndex: 1000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px'
+          padding: '12px'
         }}>
-          <div className="glass-panel" style={{
+          <div className="glass-panel modal-container" style={{
             borderRadius: 'var(--radius-xl)',
             maxWidth: '720px',
             width: '100%',
-            maxHeight: '85vh',
+            maxHeight: '88vh',
             overflowY: 'auto',
-            padding: '24px',
+            padding: '20px',
             border: '1px solid var(--border-active)',
             boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '18px'
+            gap: '16px'
           }}>
             
             {/* Modal Top Bar */}
@@ -591,7 +592,7 @@ export default function UsersPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Users style={{ width: '22px', height: '22px', color: 'var(--accent-cyan)' }} />
                 <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-main)' }}>
                     User Account #{selectedUserModal.id} ({selectedUserModal.userName})
                   </h3>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
@@ -611,7 +612,7 @@ export default function UsersPage() {
                 onClick={() => setModalTab('details')}
                 className="btn btn-secondary"
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 14px',
                   fontSize: '0.85rem',
                   borderColor: modalTab === 'details' ? 'var(--accent-cyan)' : 'var(--border-color)',
                   color: modalTab === 'details' ? 'var(--accent-cyan)' : 'var(--text-muted)'
@@ -625,7 +626,7 @@ export default function UsersPage() {
                 onClick={() => setModalTab('sessions')}
                 className="btn btn-secondary"
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 14px',
                   fontSize: '0.85rem',
                   borderColor: modalTab === 'sessions' ? 'var(--accent-cyan)' : 'var(--border-color)',
                   color: modalTab === 'sessions' ? 'var(--accent-cyan)' : 'var(--text-muted)'
@@ -643,7 +644,7 @@ export default function UsersPage() {
 
             {/* TAB 1: Account Overview */}
             {modalTab === 'details' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.88rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '0.88rem' }}>
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Username</div>
                   <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.userName}</div>

@@ -140,9 +140,9 @@ export default function DashboardPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
       {/* Dashboard Top Control Bar */}
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <LayoutDashboard style={{ color: 'var(--accent-cyan)', width: '24px', height: '24px' }} />
             Router Manager Dashboard
           </h1>
@@ -152,12 +152,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Control Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {items.length > 1 && (
             <button
               onClick={() => setIsReorderModalOpen(true)}
               className="btn btn-secondary"
-              style={{ padding: '10px 18px', fontSize: '0.9rem' }}
+              style={{ padding: '8px 16px', fontSize: '0.88rem' }}
               title="Reorder dashboard widgets"
             >
               <ArrowUpDown style={{ width: '16px', height: '16px', color: 'var(--accent-cyan)' }} />
@@ -168,7 +168,7 @@ export default function DashboardPage() {
           <button
             onClick={handleOpenAddModal}
             className="btn btn-primary"
-            style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+            style={{ padding: '8px 18px', fontSize: '0.88rem' }}
           >
             <Plus style={{ width: '18px', height: '18px' }} />
             Add Item
@@ -186,7 +186,7 @@ export default function DashboardPage() {
 
       {/* Dashboard Items Grid */}
       {!loading && items.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
+        <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
           {items.map((item, idx) => (
             <WidgetCard 
               key={item.id} 
