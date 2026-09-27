@@ -49,7 +49,17 @@ const AVAILABLE_ICONS = [
   { name: 'Database', icon: Database }
 ];
 
-const AVAILABLE_COLORS = [
+const CALM_COLORS = [
+  { key: 'slate', label: 'Slate Gray (Calm)', border: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' },
+  { key: 'sage', label: 'Sage Green (Calm)', border: '#059669', bg: 'rgba(16, 185, 129, 0.15)' },
+  { key: 'teal', label: 'Ocean Teal (Calm)', border: '#0f766e', bg: 'rgba(20, 184, 166, 0.15)' },
+  { key: 'indigo', label: 'Muted Indigo (Calm)', border: '#4f46e5', bg: 'rgba(99, 102, 241, 0.15)' },
+  { key: 'sand', label: 'Warm Sand (Calm)', border: '#b45309', bg: 'rgba(217, 119, 6, 0.15)' },
+  { key: 'lavender', label: 'Soft Lavender (Calm)', border: '#7c3aed', bg: 'rgba(139, 92, 246, 0.15)' },
+  { key: 'dusty_rose', label: 'Dusty Rose (Calm)', border: '#be123c', bg: 'rgba(244, 63, 94, 0.15)' }
+];
+
+const VIBRANT_COLORS = [
   { key: 'cyan', label: 'Cyan', border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.2)' },
   { key: 'emerald', label: 'Emerald', border: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
   { key: 'purple', label: 'Purple', border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.2)' },
@@ -57,6 +67,8 @@ const AVAILABLE_COLORS = [
   { key: 'rose', label: 'Rose', border: '#f43f5e', bg: 'rgba(244, 63, 94, 0.2)' },
   { key: 'blue', label: 'Blue', border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' }
 ];
+
+const AVAILABLE_COLORS = [...CALM_COLORS, ...VIBRANT_COLORS];
 
 const QUICK_TEMPLATES = [
   {
@@ -444,27 +456,81 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
 
               {/* Color Accent Selector */}
               <div>
-                <label className="label-text" style={{ marginBottom: '6px' }}>Accent Color Theme</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {AVAILABLE_COLORS.map(c => (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, color: c.key })}
-                      style={{
-                        padding: '5px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        background: c.bg,
-                        border: formData.color === c.key ? `2px solid ${c.border}` : `1px solid ${c.border}55`,
-                        color: c.border
-                      }}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+                <label className="label-text" style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Stat Card Color Theme</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Calm tones or vibrant accents</span>
+                </label>
+
+                {/* Calm & Muted Colors */}
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    ☕ Calm & Executive Tones:
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {CALM_COLORS.map(c => {
+                      const isSelected = formData.color === c.key;
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, color: c.key })}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            background: isSelected ? c.bg : 'var(--bg-input)',
+                            border: isSelected ? `2px solid ${c.border}` : '1px solid var(--border-color)',
+                            color: isSelected ? c.border : 'var(--text-muted)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.border }} />
+                          {c.label.replace(' (Calm)', '')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Vibrant Accent Colors */}
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-dim)', marginBottom: '6px' }}>
+                    ⚡ Vibrant Accents:
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {VIBRANT_COLORS.map(c => {
+                      const isSelected = formData.color === c.key;
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, color: c.key })}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '8px',
+                            fontSize: '0.76rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            background: isSelected ? c.bg : 'var(--bg-input)',
+                            border: isSelected ? `2px solid ${c.border}` : '1px solid var(--border-color)',
+                            color: isSelected ? c.border : 'var(--text-dim)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.border }} />
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

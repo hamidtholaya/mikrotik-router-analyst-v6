@@ -21,6 +21,35 @@
   --accent-rose: #f43f5e;
   --accent-amber: #f59e0b;
   --accent-purple: #8b5cf6;
+
+  /* Calm & Muted Color Tokens (Dark Mode) */
+  --color-slate-text: #94a3b8;
+  --color-slate-bg: rgba(148, 163, 184, 0.12);
+  --color-slate-border: rgba(148, 163, 184, 0.25);
+
+  --color-sage-text: #6ee7b7;
+  --color-sage-bg: rgba(110, 231, 183, 0.1);
+  --color-sage-border: rgba(110, 231, 183, 0.25);
+
+  --color-teal-text: #2dd4bf;
+  --color-teal-bg: rgba(45, 212, 191, 0.1);
+  --color-teal-border: rgba(45, 212, 191, 0.25);
+
+  --color-indigo-text: #a5b4fc;
+  --color-indigo-bg: rgba(165, 180, 252, 0.1);
+  --color-indigo-border: rgba(165, 180, 252, 0.25);
+
+  --color-sand-text: #fcd34d;
+  --color-sand-bg: rgba(252, 211, 77, 0.1);
+  --color-sand-border: rgba(252, 211, 77, 0.25);
+
+  --color-lavender-text: #c4b5fd;
+  --color-lavender-bg: rgba(196, 181, 253, 0.1);
+  --color-lavender-border: rgba(196, 181, 253, 0.25);
+
+  --color-dusty-rose-text: #fda4af;
+  --color-dusty-rose-bg: rgba(253, 164, 175, 0.1);
+  --color-dusty-rose-border: rgba(253, 164, 175, 0.25);
   
   --text-main: #f8fafc;
   --text-muted: #cbd5e1;
@@ -60,6 +89,35 @@
   --accent-rose: #e11d48;
   --accent-amber: #d97706;
   --accent-purple: #7c3aed;
+
+  /* Calm & Muted Color Tokens (Light Mode) */
+  --color-slate-text: #334155;
+  --color-slate-bg: rgba(51, 65, 85, 0.08);
+  --color-slate-border: rgba(51, 65, 85, 0.18);
+
+  --color-sage-text: #065f46;
+  --color-sage-bg: rgba(5, 150, 105, 0.08);
+  --color-sage-border: rgba(5, 150, 105, 0.2);
+
+  --color-teal-text: #0f766e;
+  --color-teal-bg: rgba(15, 118, 110, 0.08);
+  --color-teal-border: rgba(15, 118, 110, 0.2);
+
+  --color-indigo-text: #3730a3;
+  --color-indigo-bg: rgba(79, 70, 229, 0.08);
+  --color-indigo-border: rgba(79, 70, 229, 0.2);
+
+  --color-sand-text: #92400e;
+  --color-sand-bg: rgba(180, 83, 9, 0.08);
+  --color-sand-border: rgba(180, 83, 9, 0.2);
+
+  --color-lavender-text: #5b21b6;
+  --color-lavender-bg: rgba(124, 58, 237, 0.08);
+  --color-lavender-border: rgba(124, 58, 237, 0.2);
+
+  --color-dusty-rose-text: #9f1239;
+  --color-dusty-rose-bg: rgba(225, 29, 72, 0.08);
+  --color-dusty-rose-border: rgba(225, 29, 72, 0.2);
   
   --text-main: #0f172a;
   --text-muted: #334155;

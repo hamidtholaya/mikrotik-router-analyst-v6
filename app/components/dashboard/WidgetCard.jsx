@@ -50,8 +50,18 @@ const ICON_MAP = {
 };
 
 const COLOR_THEMES = {
-  cyan: { text: 'var(--accent-cyan)', bg: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.3)' },
-  emerald: { text: 'var(--accent-emerald)', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)' },
+  // Calm & Muted Color Options
+  slate: { text: 'var(--color-slate-text)', bg: 'var(--color-slate-bg)', border: 'var(--color-slate-border)' },
+  sage: { text: 'var(--color-sage-text)', bg: 'var(--color-sage-bg)', border: 'var(--color-sage-border)' },
+  teal: { text: 'var(--color-teal-text)', bg: 'var(--color-teal-bg)', border: 'var(--color-teal-border)' },
+  indigo: { text: 'var(--color-indigo-text)', bg: 'var(--color-indigo-bg)', border: 'var(--color-indigo-border)' },
+  sand: { text: 'var(--color-sand-text)', bg: 'var(--color-sand-bg)', border: 'var(--color-sand-border)' },
+  lavender: { text: 'var(--color-lavender-text)', bg: 'var(--color-lavender-bg)', border: 'var(--color-lavender-border)' },
+  dusty_rose: { text: 'var(--color-dusty-rose-text)', bg: 'var(--color-dusty-rose-bg)', border: 'var(--color-dusty-rose-border)' },
+
+  // Vibrant Color Accents
+  cyan: { text: 'var(--accent-cyan)', bg: 'var(--accent-cyan-glow)', border: 'var(--border-active)' },
+  emerald: { text: 'var(--accent-emerald)', bg: 'var(--accent-emerald-glow)', border: 'rgba(16, 185, 129, 0.3)' },
   purple: { text: 'var(--accent-purple)', bg: 'rgba(139, 92, 246, 0.12)', border: 'rgba(139, 92, 246, 0.3)' },
   amber: { text: 'var(--accent-amber)', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)' },
   rose: { text: 'var(--accent-rose)', bg: 'rgba(244, 63, 94, 0.12)', border: 'rgba(244, 63, 94, 0.3)' },
