@@ -19,7 +19,9 @@ import {
   Sparkles,
   Save,
   Smartphone,
-  Sliders
+  Sliders,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
 
@@ -40,7 +42,9 @@ export default function LoginPage() {
   const [connecting, setConnecting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  // Load saved credentials ONLY if the user previously checked rememberMe
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Load saved credentials (including password) if rememberMe was previously checked
   useEffect(() => {
     try {
       const saved = localStorage.getItem('mikrotik_saved_creds');
@@ -51,6 +55,7 @@ export default function LoginPage() {
           host: parsed.host || '',
           port: parsed.port || '8728',
           user: parsed.user || '',
+          password: parsed.password || '',
           tls: !!parsed.tls,
           rememberMe: true
         }));
@@ -110,7 +115,7 @@ export default function LoginPage() {
         setErrorMsg(data.error || 'Connection failed.');
       }
     } catch (err) {
-      setErrorMsg(`Failed to reach backend test server at ${serverUrl || 'local'}. Ensure your PC is running and reachable on Wi-Fi.`);
+      setErrorMsg(`Failed to reach router at ${formData.host || 'specified address'}. Ensure router is reachable and API service (port ${formData.port || '8728'}) is enabled.`);
     } finally {
       setTesting(false);
     }
@@ -148,6 +153,7 @@ export default function LoginPage() {
             host: formData.host,
             port: formData.port,
             user: formData.user,
+            password: formData.password || '',
             tls: formData.tls
           }));
         } else {
@@ -167,7 +173,7 @@ export default function LoginPage() {
         setErrorMsg(data.error || 'Failed to authenticate with router.');
       }
     } catch (err) {
-      setErrorMsg(`Network error connecting to ${serverUrl || 'backend server'}. Check PC IP and Wi-Fi connection.`);
+      setErrorMsg(`Network error connecting to router at ${formData.host || 'specified address'}. Check Wi-Fi or router connection.`);
     } finally {
       setConnecting(false);
     }
@@ -272,14 +278,41 @@ export default function LoginPage() {
                 <KeyRound style={{ width: '14px', height: '14px' }} />
                 Password
               </label>
-              <input 
-                type="password" 
-                name="password" 
-                className="input-field" 
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  name="password" 
+                  className="input-field" 
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  style={{ width: '100%', paddingRight: '42px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-dim)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '6px'
+                  }}
+                  tabIndex={-1}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff style={{ width: '16px', height: '16px', color: 'var(--accent-cyan)' }} />
+                  ) : (
+                    <Eye style={{ width: '16px', height: '16px' }} />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* SSL / TLS Option & Demo Mode */}

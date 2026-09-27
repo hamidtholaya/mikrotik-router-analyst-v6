@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server';
-import { getDashboardItems, addDashboardItem, updateDashboardItem, deleteDashboardItem } from '../../../lib/config-store';
+import { 
+  getDashboardsData, 
+  createDashboardTab, 
+  renameDashboardTab, 
+  deleteDashboardTab, 
+  addDashboardItem, 
+  updateDashboardItem, 
+  deleteDashboardItem 
+} from '../../../lib/config-store';
 
 export async function GET() {
   try {
-    const items = getDashboardItems();
-    return NextResponse.json({ success: true, items });
+    const config = getDashboardsData();
+    return NextResponse.json({ 
+      success: true, 
+      dashboards: config.dashboards, 
+      activeDashboardId: config.activeDashboardId 
+    });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -13,7 +25,45 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, type, chartType, size, dbPath, sql, color } = body;
+
+    // 1. Dashboard Tab Actions
+    if (body.action === 'create_dashboard') {
+      const { newDash, config } = createDashboardTab(body.name, body.icon);
+      return NextResponse.json({
+        success: true,
+        message: `Created dashboard "${newDash.name}".`,
+        dashboard: newDash,
+        dashboards: config.dashboards,
+        activeDashboardId: config.activeDashboardId
+      });
+    }
+
+    if (body.action === 'rename_dashboard') {
+      const res = renameDashboardTab(body.dashboardId, body.name, body.icon);
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        dashboards: res.config.dashboards,
+        activeDashboardId: res.config.activeDashboardId
+      });
+    }
+
+    if (body.action === 'delete_dashboard') {
+      const res = deleteDashboardTab(body.dashboardId);
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        dashboards: res.config.dashboards,
+        activeDashboardId: res.config.activeDashboardId
+      });
+    }
+
+    // 2. Add Widget Item Action
+    const { dashboardId, name, type, chartType, icon, prefix, suffix, subtitle, size, dbPath, sql, color } = body;
 
     if (!name || !sql) {
       return NextResponse.json(
@@ -22,14 +72,26 @@ export async function POST(request) {
       );
     }
 
-    const newItem = addDashboardItem({ name, type, chartType, size, dbPath, sql, color });
-    const items = getDashboardItems();
+    const res = addDashboardItem({ 
+      name, 
+      type, 
+      chartType, 
+      icon, 
+      prefix, 
+      suffix, 
+      subtitle, 
+      size, 
+      dbPath, 
+      sql, 
+      color 
+    }, dashboardId);
 
     return NextResponse.json({
       success: true,
-      message: `Added widget "${newItem.name}" to dashboard.`,
-      item: newItem,
-      items
+      message: `Added widget "${res.item.name}".`,
+      item: res.item,
+      dashboards: res.config.dashboards,
+      activeDashboardId: res.config.activeDashboardId
     });
 
   } catch (error) {
@@ -40,23 +102,36 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, name, type, chartType, size, dbPath, sql, color } = body;
+    const { id, dashboardId, name, type, chartType, icon, prefix, suffix, subtitle, size, dbPath, sql, color } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Widget ID is required for editing.' }, { status: 400 });
     }
 
-    const updatedItem = updateDashboardItem(id, { name, type, chartType, size, dbPath, sql, color });
-    if (!updatedItem) {
+    const res = updateDashboardItem(id, { 
+      name, 
+      type, 
+      chartType, 
+      icon, 
+      prefix, 
+      suffix, 
+      subtitle, 
+      size, 
+      dbPath, 
+      sql, 
+      color 
+    }, dashboardId);
+
+    if (!res) {
       return NextResponse.json({ success: false, error: 'Widget not found.' }, { status: 404 });
     }
 
-    const items = getDashboardItems();
     return NextResponse.json({
       success: true,
-      message: `Updated widget "${updatedItem.name}".`,
-      item: updatedItem,
-      items
+      message: `Updated widget "${res.item.name}".`,
+      item: res.item,
+      dashboards: res.config.dashboards,
+      activeDashboardId: res.config.activeDashboardId
     });
 
   } catch (error) {
@@ -68,18 +143,19 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const dashboardId = searchParams.get('dashboardId');
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Widget ID is required.' }, { status: 400 });
     }
 
-    const deleted = deleteDashboardItem(id);
-    const items = getDashboardItems();
+    const res = deleteDashboardItem(id, dashboardId);
 
     return NextResponse.json({
-      success: deleted,
-      message: deleted ? 'Widget removed successfully.' : 'Widget not found.',
-      items
+      success: res.success,
+      message: res.success ? 'Widget removed successfully.' : 'Widget not found.',
+      dashboards: res.config.dashboards,
+      activeDashboardId: res.config.activeDashboardId
     });
 
   } catch (error) {

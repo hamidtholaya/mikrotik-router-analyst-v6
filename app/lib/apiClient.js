@@ -252,34 +252,84 @@ async function handleNativeRequest(endpoint, options) {
     });
   }
 
-  // 8. Dashboard Config: /api/dashboard/config
+  // 8. Dashboard Config (Multi-Dashboard Tabs): /api/dashboard/config
   if (path === '/api/dashboard/config') {
-    const STORAGE_KEY = 'mikrotik_dashboard_config';
-    let config = [];
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) config = JSON.parse(raw);
-    } catch (e) {}
+    const STORAGE_KEY_V2 = 'mikrotik_dashboards_v2';
+    const OLD_STORAGE_KEY = 'mikrotik_dashboard_config';
 
-    // Default widgets if empty
-    if (!config || config.length === 0) {
-      config = [
-        {
-          id: 'dash_default_1',
-          name: 'Database Info & Tables',
-          type: 'stat_card',
-          dbPath: 'data/userman_active.db',
-          sql: "SELECT name FROM sqlite_master WHERE type='table';",
-          size: 'third',
-          color: 'cyan',
-          createdAt: new Date().toISOString()
+    const DEFAULT_WIDGET = {
+      id: 'dash_default_1',
+      name: 'Database Info & Tables',
+      type: 'stat_card',
+      icon: 'Database',
+      color: 'cyan',
+      prefix: '',
+      suffix: '',
+      subtitle: 'Tables in active database',
+      dbPath: 'data/userman_active.db',
+      sql: "SELECT name FROM sqlite_master WHERE type='table';",
+      size: 'third',
+      createdAt: new Date().toISOString()
+    };
+
+    function loadDashboardsConfig() {
+      try {
+        const v2Raw = localStorage.getItem(STORAGE_KEY_V2);
+        if (v2Raw) {
+          const parsed = JSON.parse(v2Raw);
+          if (parsed && Array.isArray(parsed.dashboards) && parsed.dashboards.length > 0) {
+            return parsed;
+          }
         }
-      ];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+
+        // Migrate old v1 storage if present
+        const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+        let oldItems = [];
+        if (oldRaw) {
+          try { oldItems = JSON.parse(oldRaw); } catch (e) {}
+        }
+        if (!Array.isArray(oldItems) || oldItems.length === 0) {
+          oldItems = [DEFAULT_WIDGET];
+        }
+
+        const initialV2 = {
+          activeDashboardId: 'dash_main',
+          dashboards: [
+            {
+              id: 'dash_main',
+              name: 'General Overview',
+              icon: 'LayoutDashboard',
+              items: oldItems
+            }
+          ]
+        };
+        localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(initialV2));
+        return initialV2;
+      } catch (e) {
+        return {
+          activeDashboardId: 'dash_main',
+          dashboards: [{ id: 'dash_main', name: 'General Overview', icon: 'LayoutDashboard', items: [DEFAULT_WIDGET] }]
+        };
+      }
     }
 
+    function saveDashboardsConfig(data) {
+      localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(data));
+      // Save active items into old key as fallback
+      const active = data.dashboards.find(d => d.id === data.activeDashboardId) || data.dashboards[0];
+      if (active) {
+        localStorage.setItem(OLD_STORAGE_KEY, JSON.stringify(active.items || []));
+      }
+    }
+
+    let configData = loadDashboardsConfig();
+
     if (method === 'GET') {
-      return new Response(JSON.stringify({ success: true, items: config }), {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        dashboards: configData.dashboards, 
+        activeDashboardId: configData.activeDashboardId 
+      }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -287,20 +337,92 @@ async function handleNativeRequest(endpoint, options) {
 
     if (method === 'POST') {
       const body = options.body ? JSON.parse(options.body) : {};
+
+      // 1. Create Dashboard Tab
+      if (body.action === 'create_dashboard') {
+        const newDash = {
+          id: `dash_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          name: (body.name || 'New Dashboard').trim(),
+          icon: body.icon || 'LayoutDashboard',
+          items: []
+        };
+        configData.dashboards.push(newDash);
+        configData.activeDashboardId = newDash.id;
+        saveDashboardsConfig(configData);
+        return new Response(JSON.stringify({
+          success: true,
+          dashboard: newDash,
+          dashboards: configData.dashboards,
+          activeDashboardId: configData.activeDashboardId
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // 2. Rename Dashboard Tab
+      if (body.action === 'rename_dashboard') {
+        const dash = configData.dashboards.find(d => d.id === body.dashboardId);
+        if (dash) {
+          if (body.name) dash.name = body.name.trim();
+          if (body.icon) dash.icon = body.icon;
+          saveDashboardsConfig(configData);
+          return new Response(JSON.stringify({
+            success: true,
+            dashboards: configData.dashboards,
+            activeDashboardId: configData.activeDashboardId
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ success: false, error: 'Dashboard not found' }), { status: 404 });
+      }
+
+      // 3. Delete Dashboard Tab
+      if (body.action === 'delete_dashboard') {
+        if (configData.dashboards.length <= 1) {
+          return new Response(JSON.stringify({ success: false, error: 'Cannot delete the only dashboard.' }), { status: 400 });
+        }
+        configData.dashboards = configData.dashboards.filter(d => d.id !== body.dashboardId);
+        if (configData.activeDashboardId === body.dashboardId) {
+          configData.activeDashboardId = configData.dashboards[0].id;
+        }
+        saveDashboardsConfig(configData);
+        return new Response(JSON.stringify({
+          success: true,
+          dashboards: configData.dashboards,
+          activeDashboardId: configData.activeDashboardId
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // 4. Add Widget to Dashboard
+      const targetId = body.dashboardId || configData.activeDashboardId;
+      const targetDash = configData.dashboards.find(d => d.id === targetId) || configData.dashboards[0];
+
       const newItem = {
         id: `dash_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         name: body.name || 'Untitled Widget',
         type: body.type || 'table',
         chartType: body.chartType || 'bar',
+        icon: body.icon || 'Activity',
+        prefix: body.prefix || '',
+        suffix: body.suffix || '',
+        subtitle: body.subtitle || '',
+        xAxisCol: body.xAxisCol || '',
+        yAxisCols: Array.isArray(body.yAxisCols) ? body.yAxisCols : [],
+        dualAxis: !!body.dualAxis,
+        chartMode: body.chartMode || 'grouped',
         size: body.size || 'full',
         dbPath: body.dbPath || 'data/userman_active.db',
         sql: body.sql || '',
         color: body.color || 'cyan',
         createdAt: new Date().toISOString()
       };
-      config.push(newItem);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      return new Response(JSON.stringify({ success: true, item: newItem, items: config }), {
+
+      targetDash.items.push(newItem);
+      saveDashboardsConfig(configData);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        item: newItem, 
+        dashboards: configData.dashboards,
+        activeDashboardId: configData.activeDashboardId
+      }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -308,23 +430,47 @@ async function handleNativeRequest(endpoint, options) {
 
     if (method === 'PUT') {
       const body = options.body ? JSON.parse(options.body) : {};
-      const idx = config.findIndex(item => item.id === body.id);
-      if (idx !== -1) {
-        config[idx] = { ...config[idx], ...body, updatedAt: new Date().toISOString() };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-        return new Response(JSON.stringify({ success: true, item: config[idx], items: config }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      const targetId = body.dashboardId || configData.activeDashboardId;
+      const targetDash = configData.dashboards.find(d => d.id === targetId) || configData.dashboards[0];
+
+      if (targetDash) {
+        const idx = targetDash.items.findIndex(item => item.id === body.id);
+        if (idx !== -1) {
+          targetDash.items[idx] = { 
+            ...targetDash.items[idx], 
+            ...body, 
+            updatedAt: new Date().toISOString() 
+          };
+          saveDashboardsConfig(configData);
+          return new Response(JSON.stringify({ 
+            success: true, 
+            item: targetDash.items[idx], 
+            dashboards: configData.dashboards,
+            activeDashboardId: configData.activeDashboardId
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       }
       return new Response(JSON.stringify({ success: false, error: 'Widget not found' }), { status: 404 });
     }
 
     if (method === 'DELETE') {
       const id = params.get('id');
-      config = config.filter(item => item.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      return new Response(JSON.stringify({ success: true, items: config }), {
+      const targetId = params.get('dashboardId');
+
+      for (const dash of configData.dashboards) {
+        if (!targetId || dash.id === targetId) {
+          dash.items = dash.items.filter(item => item.id !== id);
+        }
+      }
+      saveDashboardsConfig(configData);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        dashboards: configData.dashboards,
+        activeDashboardId: configData.activeDashboardId
+      }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -333,31 +479,35 @@ async function handleNativeRequest(endpoint, options) {
 
   // 9. Dashboard Reorder: /api/dashboard/config/reorder
   if (path === '/api/dashboard/config/reorder') {
-    const STORAGE_KEY = 'mikrotik_dashboard_config';
+    const STORAGE_KEY_V2 = 'mikrotik_dashboards_v2';
     const body = options.body ? JSON.parse(options.body) : {};
-    const { orderedIds } = body;
-    let config = [];
+    const { orderedIds, dashboardId } = body;
+    let configData = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) config = JSON.parse(raw);
+      const raw = localStorage.getItem(STORAGE_KEY_V2);
+      if (raw) configData = JSON.parse(raw);
     } catch (e) {}
 
-    if (Array.isArray(orderedIds) && config.length > 0) {
-      const itemMap = new Map(config.map(item => [item.id, item]));
-      const newItems = [];
-      for (const id of orderedIds) {
-        if (itemMap.has(id)) {
-          newItems.push(itemMap.get(id));
-          itemMap.delete(id);
+    if (configData && Array.isArray(orderedIds)) {
+      const targetId = dashboardId || configData.activeDashboardId;
+      const targetDash = configData.dashboards.find(d => d.id === targetId) || configData.dashboards[0];
+      if (targetDash) {
+        const itemMap = new Map(targetDash.items.map(item => [item.id, item]));
+        const newItems = [];
+        for (const id of orderedIds) {
+          if (itemMap.has(id)) {
+            newItems.push(itemMap.get(id));
+            itemMap.delete(id);
+          }
         }
+        for (const remaining of itemMap.values()) {
+          newItems.push(remaining);
+        }
+        targetDash.items = newItems;
+        localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(configData));
       }
-      for (const remaining of itemMap.values()) {
-        newItems.push(remaining);
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
-      return new Response(JSON.stringify({ success: true, items: newItems }), { status: 200 });
     }
-    return new Response(JSON.stringify({ success: true, items: config }), { status: 200 });
+    return new Response(JSON.stringify({ success: true, dashboards: configData ? configData.dashboards : [] }), { status: 200 });
   }
 
   // 10. Users List: /api/userman/users

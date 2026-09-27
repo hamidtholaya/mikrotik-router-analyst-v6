@@ -46,6 +46,13 @@ try {
     middlewareMoved = true;
     console.log('[Mobile Build] Stashed middleware.');
   }
+  // Clean .next cache to ensure clean static export
+  const nextCacheDir = path.join(rootDir, '.next');
+  if (fs.existsSync(nextCacheDir)) {
+    try {
+      fs.rmSync(nextCacheDir, { recursive: true, force: true });
+    } catch (e) {}
+  }
 
   console.log('[Mobile Build] Running Next.js static export...');
   execSync('npx next build', {

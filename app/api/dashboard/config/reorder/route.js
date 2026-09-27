@@ -4,7 +4,7 @@ import { reorderDashboardItems } from '../../../../lib/config-store';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { orderedIds } = body;
+    const { orderedIds, dashboardId } = body;
 
     if (!Array.isArray(orderedIds)) {
       return NextResponse.json(
@@ -13,12 +13,13 @@ export async function POST(request) {
       );
     }
 
-    const items = reorderDashboardItems(orderedIds);
+    const config = reorderDashboardItems(orderedIds, dashboardId);
 
     return NextResponse.json({
       success: true,
       message: 'Dashboard items reordered successfully.',
-      items
+      dashboards: config.dashboards,
+      activeDashboardId: config.activeDashboardId
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

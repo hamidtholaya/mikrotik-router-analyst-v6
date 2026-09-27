@@ -13,9 +13,50 @@ import {
   Loader2,
   Database,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Users,
+  Wifi,
+  Download,
+  Upload,
+  DollarSign,
+  CreditCard,
+  ShieldCheck,
+  HardDrive,
+  Cpu,
+  Clock,
+  Radio,
+  Layers,
+  Zap
 } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
+
+const ICON_MAP = {
+  Activity,
+  Users,
+  Wifi,
+  Download,
+  Upload,
+  DollarSign,
+  CreditCard,
+  ShieldCheck,
+  HardDrive,
+  Cpu,
+  Clock,
+  Radio,
+  Layers,
+  Zap,
+  BarChart3,
+  Database
+};
+
+const COLOR_THEMES = {
+  cyan: { text: 'var(--accent-cyan)', bg: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.3)' },
+  emerald: { text: 'var(--accent-emerald)', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)' },
+  purple: { text: 'var(--accent-purple)', bg: 'rgba(139, 92, 246, 0.12)', border: 'rgba(139, 92, 246, 0.3)' },
+  amber: { text: 'var(--accent-amber)', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)' },
+  rose: { text: 'var(--accent-rose)', bg: 'rgba(244, 63, 94, 0.12)', border: 'rgba(244, 63, 94, 0.3)' },
+  blue: { text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)' }
+};
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -128,18 +169,29 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
     const datasets = seriesCols.map((colName, idx) => {
       const values = rows.map(r => Number(r[colName]) || 0);
       const palette = colorPalettes[idx % colorPalettes.length];
+      const isLine = chartType === 'line';
 
       const dataset = {
         label: colName,
         data: values,
         backgroundColor: chartType === 'pie' || chartType === 'doughnut' 
           ? colorPalettes.map(c => c.bg) 
-          : palette.bg,
+          : isLine 
+            ? palette.border + '18' // Soft translucent gradient fill (10% opacity)
+            : palette.bg,
         borderColor: chartType === 'pie' || chartType === 'doughnut' 
           ? colorPalettes.map(c => c.border) 
           : palette.border,
-        borderWidth: 2,
-        borderRadius: 6
+        borderWidth: isLine ? 2.5 : 2,
+        borderRadius: isLine ? 0 : 6,
+        fill: isLine,
+        tension: isLine ? 0.35 : 0, // Smooth curves instead of sharp angles
+        pointRadius: isLine ? 0 : 3, // Sleek Sparkline: no fat/wide dots crowding the mobile line!
+        pointHoverRadius: isLine ? 6 : 6, // Points pop up smoothly when finger touches/drags
+        pointHitRadius: isLine ? 25 : 10, // Large touch area so it's super easy to tap on phones
+        pointBackgroundColor: palette.border,
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2
       };
 
       if (item.dualAxis && seriesCols.length > 1) {
@@ -158,10 +210,29 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
       legend: {
         position: 'top',
-        labels: { color: 'var(--text-muted)', font: { family: 'Outfit' } }
+        labels: { 
+          color: 'var(--text-muted)', 
+          font: { family: 'Outfit', size: 11 },
+          boxWidth: 10,
+          padding: 8
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        titleColor: '#f1f5f9',
+        bodyColor: '#cbd5e1',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        padding: 8,
+        cornerRadius: 8,
+        displayColors: true
       }
     },
     scales: item.chartType === 'pie' || item.chartType === 'doughnut' ? {} : {
@@ -170,11 +241,11 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
         ticks: { 
           color: 'var(--text-muted)',
           autoSkip: true,
-          maxTicksLimit: 6,
+          maxTicksLimit: 5,
           maxRotation: 0,
           font: { family: 'Outfit', size: 10 }
         }, 
-        grid: { color: 'rgba(125,125,125,0.08)' } 
+        grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false } 
       },
       y: { 
         type: 'linear',
@@ -186,7 +257,7 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
           maxTicksLimit: 5,
           font: { family: 'Outfit', size: 10 }
         }, 
-        grid: { color: 'rgba(125,125,125,0.08)' } 
+        grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false } 
       },
       ...(hasDualAxis ? {
         y1: {
@@ -389,19 +460,56 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
       {!loading && !error && data && (
         <>
           {/* STAT CARD VIEW */}
-          {item.type === 'stat_card' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
-                {data.rows && data.rows.length > 0 
-                  ? (Object.values(data.rows[0])[0] ?? '0') 
-                  : '0'}
+          {item.type === 'stat_card' && (() => {
+            const rawVal = data.rows && data.rows.length > 0 
+              ? (Object.values(data.rows[0])[0] ?? '0') 
+              : '0';
+            const theme = COLOR_THEMES[item.color] || COLOR_THEMES.cyan;
+            const CardIcon = ICON_MAP[item.icon] || Activity;
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{
+                    fontSize: '2.1rem',
+                    fontWeight: '800',
+                    color: theme.text,
+                    letterSpacing: '-0.03em',
+                    lineHeight: 1.1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {item.prefix || ''}{rawVal}{item.suffix ? ` ${item.suffix}` : ''}
+                  </div>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: theme.bg,
+                    border: `1px solid ${theme.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: theme.text,
+                    flexShrink: 0
+                  }}>
+                    <CardIcon style={{ width: '20px', height: '20px' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.subtitle || `Result from ${data.rowCount} ${data.rowCount === 1 ? 'row' : 'rows'}`}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                    <Database style={{ width: '10px', height: '10px', color: 'var(--accent-cyan)' }} />
+                    {data.rowCount} r
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Database style={{ width: '12px', height: '12px', color: 'var(--accent-cyan)' }} />
-                Result from {data.rowCount} {data.rowCount === 1 ? 'row' : 'rows'}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TABLE VIEW */}
           {item.type === 'table' && (

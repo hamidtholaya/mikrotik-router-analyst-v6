@@ -14,22 +14,107 @@ import {
   Edit3, 
   Database,
   Layers,
-  BarChart2
+  BarChart2,
+  Users,
+  Wifi,
+  Download,
+  Upload,
+  DollarSign,
+  CreditCard,
+  ShieldCheck,
+  HardDrive,
+  Cpu,
+  Clock,
+  Radio,
+  Zap,
+  Sparkles
 } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
 
-export default function AddWidgetModal({ isOpen, initialData, onClose, onSave }) {
+const AVAILABLE_ICONS = [
+  { name: 'Activity', icon: Activity },
+  { name: 'Users', icon: Users },
+  { name: 'Wifi', icon: Wifi },
+  { name: 'Download', icon: Download },
+  { name: 'Upload', icon: Upload },
+  { name: 'DollarSign', icon: DollarSign },
+  { name: 'CreditCard', icon: CreditCard },
+  { name: 'ShieldCheck', icon: ShieldCheck },
+  { name: 'HardDrive', icon: HardDrive },
+  { name: 'Cpu', icon: Cpu },
+  { name: 'Clock', icon: Clock },
+  { name: 'Radio', icon: Radio },
+  { name: 'Layers', icon: Layers },
+  { name: 'Zap', icon: Zap },
+  { name: 'Database', icon: Database }
+];
+
+const AVAILABLE_COLORS = [
+  { key: 'cyan', label: 'Cyan', border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.2)' },
+  { key: 'emerald', label: 'Emerald', border: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
+  { key: 'purple', label: 'Purple', border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.2)' },
+  { key: 'amber', label: 'Amber', border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)' },
+  { key: 'rose', label: 'Rose', border: '#f43f5e', bg: 'rgba(244, 63, 94, 0.2)' },
+  { key: 'blue', label: 'Blue', border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' }
+];
+
+const QUICK_TEMPLATES = [
+  {
+    name: 'Total Users',
+    type: 'stat_card',
+    icon: 'Users',
+    color: 'cyan',
+    suffix: 'Users',
+    subtitle: 'Total registered user accounts',
+    sql: 'SELECT COUNT(*) AS total_users FROM user;'
+  },
+  {
+    name: 'Active Hotspot Users',
+    type: 'stat_card',
+    icon: 'Wifi',
+    color: 'emerald',
+    suffix: 'Active',
+    subtitle: 'Accounts currently enabled',
+    sql: 'SELECT COUNT(*) AS active_users FROM user WHERE disabled = 0;'
+  },
+  {
+    name: 'Total Sessions Count',
+    type: 'stat_card',
+    icon: 'Radio',
+    color: 'purple',
+    suffix: 'Sessions',
+    subtitle: 'Historical session connections',
+    sql: 'SELECT COUNT(*) AS total_sessions FROM usermgr_sessions;'
+  },
+  {
+    name: 'Top 5 Users by Download',
+    type: 'table',
+    sql: 'SELECT CAST(userName AS TEXT) AS User, downloadUsed FROM user ORDER BY downloadUsed DESC LIMIT 5;'
+  },
+  {
+    name: 'Database Tables Summary',
+    type: 'table',
+    sql: "SELECT name FROM sqlite_master WHERE type='table';"
+  }
+];
+
+export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, dashboardId }) {
   const isEditing = !!(initialData && initialData.id);
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'table', // stat_card, table, chart
-    chartType: 'bar', // bar, line, pie, doughnut
+    type: 'table',
+    chartType: 'bar',
+    icon: 'Activity',
+    color: 'cyan',
+    prefix: '',
+    suffix: '',
+    subtitle: '',
     xAxisCol: '',
     yAxisCols: [],
     dualAxis: false,
-    chartMode: 'grouped', // grouped, stacked
-    size: 'half', // full, half, third
+    chartMode: 'grouped',
+    size: 'half',
     dbPath: 'data/userman_active.db',
     sql: 'SELECT * FROM user LIMIT 10;'
   });
@@ -45,6 +130,11 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
         name: initialData.name || '',
         type: initialData.type || 'table',
         chartType: initialData.chartType || 'bar',
+        icon: initialData.icon || 'Activity',
+        color: initialData.color || 'cyan',
+        prefix: initialData.prefix || '',
+        suffix: initialData.suffix || '',
+        subtitle: initialData.subtitle || '',
         xAxisCol: initialData.xAxisCol || '',
         yAxisCols: Array.isArray(initialData.yAxisCols) ? initialData.yAxisCols : [],
         dualAxis: !!initialData.dualAxis,
@@ -54,7 +144,6 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
         sql: initialData.sql || 'SELECT * FROM user LIMIT 10;'
       });
 
-      // Auto test query when editing to detect column schema
       if (initialData.sql) {
         runTestQuery(initialData.sql, initialData.dbPath || 'data/userman_active.db');
       } else {
@@ -66,6 +155,11 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
         name: '',
         type: 'table',
         chartType: 'bar',
+        icon: 'Activity',
+        color: 'cyan',
+        prefix: '',
+        suffix: '',
+        subtitle: '',
         xAxisCol: '',
         yAxisCols: [],
         dualAxis: false,
@@ -98,8 +192,6 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
 
       if (data.success) {
         setTestResult(data);
-        
-        // Auto-assign default X-axis and Y-axis if not already specified
         if (data.columns && data.columns.length > 0) {
           const defaultX = data.columns[0];
           const defaultY = data.columns.slice(1);
@@ -120,6 +212,21 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
     }
   };
 
+  const applyTemplate = (tpl) => {
+    setFormData(prev => ({
+      ...prev,
+      name: tpl.name,
+      type: tpl.type,
+      icon: tpl.icon || prev.icon,
+      color: tpl.color || prev.color,
+      prefix: tpl.prefix || '',
+      suffix: tpl.suffix || '',
+      subtitle: tpl.subtitle || '',
+      sql: tpl.sql
+    }));
+    runTestQuery(tpl.sql, formData.dbPath);
+  };
+
   const toggleYAxisCol = (colName) => {
     setFormData(prev => {
       const current = prev.yAxisCols || [];
@@ -134,7 +241,10 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    onSave(formData);
+    onSave({
+      ...formData,
+      dashboardId
+    });
     onClose();
   };
 
@@ -153,13 +263,13 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '16px'
     }}>
       <div className="glass-panel" style={{
         borderRadius: 'var(--radius-xl)',
         maxWidth: '720px',
         width: '100%',
-        maxHeight: '90vh',
+        maxHeight: '92vh',
         overflowY: 'auto',
         border: '1px solid var(--border-active)',
         boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
@@ -169,7 +279,7 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
         
         {/* Header */}
         <div style={{
-          padding: '20px 24px',
+          padding: '18px 24px',
           borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
@@ -187,14 +297,14 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
               justifyContent: 'center',
               color: 'var(--accent-cyan)'
             }}>
-              {isEditing ? <Edit3 style={{ width: '20px', height: '20px' }} /> : <Plus style={{ width: '20px', height: '20px' }} />}
+              {isEditing ? <Edit3 style={{ width: '18px', height: '18px' }} /> : <Plus style={{ width: '18px', height: '18px' }} />}
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-main)' }}>
-                {isEditing ? 'Edit Dashboard Item' : 'Add Dashboard Item'}
+              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                {isEditing ? 'Edit Widget' : 'Add Dashboard Widget'}
               </h2>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                Configure dynamic SQL query, visualization type, multi-series options, and layout bounds
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                Customize query, display type, icon, and mobile styling
               </p>
             </div>
           </div>
@@ -214,47 +324,56 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
           </button>
         </div>
 
-        {/* Body Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           
+          {/* Quick Starter Templates */}
+          {!isEditing && (
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', padding: '12px 14px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles style={{ width: '13px', height: '13px', color: 'var(--accent-amber)' }} />
+                Quick Starter Templates:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {QUICK_TEMPLATES.map((tpl, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => applyTemplate(tpl)}
+                    style={{
+                      background: 'rgba(6, 182, 212, 0.08)',
+                      border: '1px solid rgba(6, 182, 212, 0.25)',
+                      color: 'var(--accent-cyan)',
+                      fontSize: '0.75rem',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + {tpl.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Item Name */}
           <div>
             <label className="label-text">
-              Item Title / Name <span style={{ color: 'var(--accent-rose)' }}>*</span>
+              Widget Title / Name <span style={{ color: 'var(--accent-rose)' }}>*</span>
             </label>
             <input 
               type="text" 
               required
               className="input-field" 
-              placeholder="e.g. Daily Sales & Traffic, Active Users Count..."
+              placeholder="e.g. Active Hotspot Users, Daily Traffic..."
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
-          {/* Database Path */}
-          <div>
-            <label className="label-text">
-              Target Database File Path
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Database style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: 'var(--accent-cyan)' }} />
-              <input 
-                type="text" 
-                className="input-field" 
-                style={{ paddingLeft: '38px', fontFamily: 'var(--font-mono)' }}
-                placeholder="data/userman_active.db"
-                value={formData.dbPath}
-                onChange={(e) => setFormData({ ...formData, dbPath: e.target.value })}
-              />
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Default active database: <code style={{ color: 'var(--accent-cyan)' }}>data/userman_active.db</code> (or custom path like <code style={{ color: 'var(--accent-purple)' }}>data/backups/...</code>)
-            </div>
-          </div>
-
           {/* Type Select & Width Size */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label className="label-text">Widget Type</label>
               <select 
@@ -275,19 +394,124 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                 value={formData.size}
                 onChange={(e) => setFormData({ ...formData, size: e.target.value })}
               >
-                <option value="third">1/3 Width (4 Columns)</option>
-                <option value="half">Half Width (6 Columns - Default)</option>
-                <option value="full">Full Width (12 Columns)</option>
+                <option value="third">1/3 Width (Compact on Tablets/PC)</option>
+                <option value="half">Half Width (Default)</option>
+                <option value="full">Full Width (100% Columns)</option>
               </select>
             </div>
           </div>
 
-          {/* Subtype options for Chart */}
+          {/* STAT CARD CUSTOMIZATION OPTIONS */}
+          {formData.type === 'stat_card' && (
+            <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Activity style={{ width: '15px', height: '15px' }} />
+                Stat Card Customization (Icon, Colors & Subtitles)
+              </div>
+
+              {/* Icon Selector */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '6px' }}>Choose Icon</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {AVAILABLE_ICONS.map((item, idx) => {
+                    const IconComp = item.icon;
+                    const isSelected = formData.icon === item.name;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: item.name })}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          background: isSelected ? 'rgba(6, 182, 212, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                          border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                          color: isSelected ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title={item.name}
+                      >
+                        <IconComp style={{ width: '18px', height: '18px' }} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Color Accent Selector */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '6px' }}>Accent Color Theme</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {AVAILABLE_COLORS.map(c => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color: c.key })}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        background: c.bg,
+                        border: formData.color === c.key ? `2px solid ${c.border}` : `1px solid ${c.border}55`,
+                        color: c.border
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Prefix & Suffix */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="label-text">Prefix Symbol</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. $, #"
+                    value={formData.prefix}
+                    onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label-text">Suffix Unit</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Users, MB, %"
+                    value={formData.suffix}
+                    onChange={(e) => setFormData({ ...formData, suffix: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Subtitle */}
+              <div>
+                <label className="label-text">Subtitle / Description</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Active Hotspot sessions right now"
+                  value={formData.subtitle}
+                  onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* CHART OPTIONS */}
           {formData.type === 'chart' && (
             <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--accent-cyan)' }}>
               <div style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <BarChart3 style={{ width: '16px', height: '16px' }} />
-                Chart Configuration & Multi-Column Mapping
+                Chart Configuration & Mobile Line Styling
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -299,7 +523,7 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                     onChange={(e) => setFormData({ ...formData, chartType: e.target.value })}
                   >
                     <option value="bar">Bar Chart</option>
-                    <option value="line">Line Chart</option>
+                    <option value="line">Line Chart (Sleek Mobile Sparkline)</option>
                     <option value="pie">Pie Chart</option>
                     <option value="doughnut">Doughnut Chart</option>
                   </select>
@@ -318,10 +542,10 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                 </div>
               </div>
 
-              {/* X-Axis Label Column Selector */}
+              {/* X-Axis Column Selector */}
               {availableCols.length > 0 && (
                 <div>
-                  <label className="label-text">X-Axis Label Column (Horizontal Axis)</label>
+                  <label className="label-text">X-Axis Label Column</label>
                   <select
                     className="input-field"
                     value={formData.xAxisCol || availableCols[0]}
@@ -334,11 +558,11 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                 </div>
               )}
 
-              {/* Data Series Y-Axis Columns Selection */}
+              {/* Data Series Y-Axis Columns */}
               {availableCols.length > 0 && (
                 <div>
-                  <label className="label-text">Data Series to Plot (Y-Axis Values)</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
+                  <label className="label-text">Data Series (Y-Axis Values)</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
                     {availableCols.map((col, idx) => {
                       const isSelected = formData.yAxisCols.includes(col);
                       const isXCol = (formData.xAxisCol || availableCols[0]) === col;
@@ -348,9 +572,9 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                           type="button"
                           onClick={() => toggleYAxisCol(col)}
                           style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.82rem',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
                             fontWeight: '600',
                             cursor: 'pointer',
                             border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
@@ -375,21 +599,24 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
                   </div>
                 </div>
               )}
-
-              {/* Dual Y-Axis Checkbox */}
-              {formData.yAxisCols.length > 1 && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '4px', fontSize: '0.85rem', color: 'var(--text-main)' }}>
-                  <input 
-                    type="checkbox"
-                    checked={formData.dualAxis}
-                    onChange={(e) => setFormData({ ...formData, dualAxis: e.target.checked })}
-                    style={{ width: '16px', height: '16px', accentColor: 'var(--accent-cyan)' }}
-                  />
-                  Enable Dual Y-Axes (Separate scales for left & right values, e.g. Count vs Money)
-                </label>
-              )}
             </div>
           )}
+
+          {/* Database Path */}
+          <div>
+            <label className="label-text">Database Target</label>
+            <div style={{ position: 'relative' }}>
+              <Database style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', color: 'var(--accent-cyan)' }} />
+              <input 
+                type="text" 
+                className="input-field" 
+                style={{ paddingLeft: '38px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                placeholder="data/userman_active.db"
+                value={formData.dbPath}
+                onChange={(e) => setFormData({ ...formData, dbPath: e.target.value })}
+              />
+            </div>
+          </div>
 
           {/* SQL Textarea */}
           <div>
@@ -421,29 +648,29 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
 
             <textarea
               required
-              rows={4}
+              rows={3}
               className="input-field"
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', lineHeight: 1.4 }}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', lineHeight: 1.4 }}
               placeholder="SELECT COUNT(*) as activeUsers FROM user WHERE disabled = 0;"
               value={formData.sql}
               onChange={(e) => setFormData({ ...formData, sql: e.target.value })}
             />
           </div>
 
-          {/* Test Results Preview Box */}
+          {/* Query Test Results / Error */}
           {testError && (
             <div style={{
               background: 'rgba(244, 63, 94, 0.1)',
               border: '1px solid rgba(244, 63, 94, 0.3)',
               borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
+              padding: '10px 14px',
               color: 'var(--accent-rose)',
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px'
+              gap: '8px'
             }}>
-              <AlertCircle style={{ width: '18px', height: '18px', shrink: 0 }} />
+              <AlertCircle style={{ width: '16px', height: '16px', shrink: 0 }} />
               <div>{testError}</div>
             </div>
           )}
@@ -453,54 +680,20 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
               background: 'rgba(16, 185, 129, 0.08)',
               border: '1px solid rgba(16, 185, 129, 0.25)',
               borderRadius: 'var(--radius-md)',
-              padding: '14px 16px',
+              padding: '10px 14px',
+              color: 'var(--accent-emerald)',
+              fontSize: '0.82rem',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
               gap: '8px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--accent-emerald)', fontWeight: '700', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CheckCircle2 style={{ width: '16px', height: '16px' }} />
-                  Query Executed Successfully! ({testResult.rowCount} {testResult.rowCount === 1 ? 'row' : 'rows'} returned)
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                  Detected Columns: {availableCols.join(', ')}
-                </div>
-              </div>
-
-              {/* Sample Data Table Preview */}
-              <div style={{ overflowX: 'auto', maxHeight: '140px', marginTop: '4px' }}>
-                <table className="data-table" style={{ fontSize: '0.78rem' }}>
-                  <thead>
-                    <tr>
-                      {availableCols.map((col, idx) => (
-                        <th key={idx}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {testResult.rows.slice(0, 3).map((row, rIdx) => (
-                      <tr key={rIdx}>
-                        {availableCols.map((col, cIdx) => (
-                          <td key={cIdx}>{String(row[col] ?? '')}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <CheckCircle2 style={{ width: '16px', height: '16px', shrink: 0 }} />
+              <div>Query valid! Returned {testResult.rowCount} {testResult.rowCount === 1 ? 'row' : 'rows'}. Columns: {testResult.columns.join(', ')}</div>
             </div>
           )}
 
-          {/* Footer Save & Cancel Buttons */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '12px',
-            borderTop: '1px solid var(--border-color)',
-            paddingTop: '16px'
-          }}>
+          {/* Modal Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
             <button
               type="button"
               onClick={onClose}
@@ -508,13 +701,11 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
             >
               Cancel
             </button>
-
             <button
               type="submit"
               className="btn btn-primary"
             >
-              <CheckCircle2 style={{ width: '16px', height: '16px' }} />
-              {isEditing ? 'Update Item' : 'Save Dashboard Item'}
+              {isEditing ? 'Save Changes' : 'Add Widget'}
             </button>
           </div>
 
