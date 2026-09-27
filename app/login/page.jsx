@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Router, 
@@ -16,26 +16,47 @@ import {
   Lock,
   Activity,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Save
 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    // host: '192.168.88.1',
     host: '',
     port: '8728',
-    user: 'admin',
+    user: '',
     password: '',
     tls: false,
-    demo: false
+    demo: false,
+    rememberMe: false
   });
 
   const [testing, setTesting] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Load saved credentials ONLY if the user previously checked rememberMe
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mikrotik_saved_creds');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setFormData(prev => ({
+          ...prev,
+          host: parsed.host || '',
+          port: parsed.port || '8728',
+          user: parsed.user || '',
+          tls: !!parsed.tls,
+          rememberMe: true
+        }));
+      }
+    } catch (e) {
+      // Ignore parse error
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -85,6 +106,16 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
+        if (formData.rememberMe) {
+          localStorage.setItem('mikrotik_saved_creds', JSON.stringify({
+            host: formData.host,
+            port: formData.port,
+            user: formData.user,
+            tls: formData.tls
+          }));
+        } else {
+          localStorage.removeItem('mikrotik_saved_creds');
+        }
         router.push('/dashboard');
         router.refresh();
       } else {
@@ -226,6 +257,21 @@ export default function LoginPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <input 
                   type="checkbox" 
+                  id="rememberMe" 
+                  name="rememberMe" 
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+                />
+                <label htmlFor="rememberMe" style={{ fontSize: '0.88rem', color: formData.rememberMe ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: formData.rememberMe ? '600' : '400' }}>
+                  <Save style={{ width: '14px', height: '14px', color: formData.rememberMe ? 'var(--accent-cyan)' : 'var(--text-dim)' }} />
+                  Remember credentials on this device
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input 
+                  type="checkbox" 
                   id="demo" 
                   name="demo" 
                   checked={formData.demo}
@@ -290,7 +336,7 @@ export default function LoginPage() {
           
           {/* Default Info box */}
           <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#fff', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-main)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Activity style={{ color: 'var(--accent-cyan)', width: '18px', height: '18px' }} />
               API Connection Status
             </h3>
