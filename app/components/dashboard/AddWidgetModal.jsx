@@ -16,6 +16,7 @@ import {
   Layers,
   BarChart2
 } from 'lucide-react';
+import { apiFetch } from '../../lib/apiClient';
 
 export default function AddWidgetModal({ isOpen, initialData, onClose, onSave }) {
   const isEditing = !!(initialData && initialData.id);
@@ -85,7 +86,7 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave })
     setTestResult(null);
     setTestError(null);
     try {
-      const res = await fetch('/api/dashboard/query', {
+      const res = await apiFetch('/api/dashboard/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

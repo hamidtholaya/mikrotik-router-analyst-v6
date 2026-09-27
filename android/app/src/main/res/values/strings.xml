@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MikroTik Analyst</string>
+    <string name="title_activity_main">MikroTik Analyst</string>
+    <string name="package_name">com.routeranalyst.mikrotik</string>
+    <string name="custom_url_scheme">com.routeranalyst.mikrotik</string>
+</resources>

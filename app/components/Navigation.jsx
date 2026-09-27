@@ -20,6 +20,7 @@ import {
   Radio,
   SlidersHorizontal
 } from 'lucide-react';
+import { apiFetch } from '../lib/apiClient';
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -54,15 +55,34 @@ export default function Navigation() {
 
   const checkSession = async () => {
     try {
-      const res = await fetch('/api/auth/session');
+      const res = await apiFetch('/api/auth/session');
       const data = await res.json();
       if (data.authenticated) {
         setSession(data.session);
+        localStorage.setItem('mikrotik_session', JSON.stringify(data.session));
+      } else {
+        const stored = localStorage.getItem('mikrotik_session');
+        if (stored) {
+          try {
+            setSession(JSON.parse(stored));
+          } catch (e) {
+            setSession(null);
+          }
+        } else {
+          setSession(null);
+        }
+      }
+    } catch (err) {
+      const stored = localStorage.getItem('mikrotik_session');
+      if (stored) {
+        try {
+          setSession(JSON.parse(stored));
+        } catch (e) {
+          setSession(null);
+        }
       } else {
         setSession(null);
       }
-    } catch (err) {
-      setSession(null);
     } finally {
       setLoading(false);
     }
@@ -72,7 +92,7 @@ export default function Navigation() {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const res = await fetch('/api/userman/sync', { method: 'POST' });
+      const res = await apiFetch('/api/userman/sync', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setSyncMsg('Synced OK');
@@ -91,13 +111,15 @@ export default function Navigation() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      localStorage.removeItem('mikrotik_session');
       setSession(null);
       setMobileDrawerOpen(false);
       router.push('/login');
       router.refresh();
-    } catch (err) {
-      console.error('Logout error:', err);
     }
   };
 

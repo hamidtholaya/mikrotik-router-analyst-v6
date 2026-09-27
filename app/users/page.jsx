@@ -30,6 +30,7 @@ import {
   Radio,
   Loader2
 } from 'lucide-react';
+import { apiFetch } from '../lib/apiClient';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -100,7 +101,7 @@ export default function UsersPage() {
         sortDir
       });
 
-      const res = await fetch(`/api/userman/users?${params.toString()}`);
+      const res = await apiFetch(`/api/userman/users?${params.toString()}`);
       const result = await res.json();
 
       if (result.success) {
@@ -126,7 +127,7 @@ export default function UsersPage() {
         status
       });
 
-      const res = await fetch(`/api/userman/sessions?${params.toString()}`);
+      const res = await apiFetch(`/api/userman/sessions?${params.toString()}`);
       const result = await res.json();
 
       if (result.success) {

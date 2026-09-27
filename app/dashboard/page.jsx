@@ -12,6 +12,7 @@ import WidgetCard from '../components/dashboard/WidgetCard';
 import AddWidgetModal from '../components/dashboard/AddWidgetModal';
 import ConfirmDeleteModal from '../components/dashboard/ConfirmDeleteModal';
 import ReorderModal from '../components/dashboard/ReorderModal';
+import { apiFetch } from '../lib/apiClient';
 
 export default function DashboardPage() {
   const [items, setItems] = useState([]);
@@ -29,7 +30,7 @@ export default function DashboardPage() {
   const fetchDashboardConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/dashboard/config');
+      const res = await apiFetch('/api/dashboard/config');
       const data = await res.json();
       if (data.success && data.items) {
         setItems(data.items);
@@ -57,7 +58,7 @@ export default function DashboardPage() {
       const url = '/api/dashboard/config';
       const method = isEditing ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(widgetData)
@@ -74,7 +75,7 @@ export default function DashboardPage() {
 
   const handleSaveOrder = async (orderedIds) => {
     try {
-      const res = await fetch('/api/dashboard/config/reorder', {
+      const res = await apiFetch('/api/dashboard/config/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderedIds })
@@ -120,7 +121,7 @@ export default function DashboardPage() {
     setIsDeleting(true);
 
     try {
-      const res = await fetch(`/api/dashboard/config?id=${deletingItem.id}`, {
+      const res = await apiFetch(`/api/dashboard/config?id=${deletingItem.id}`, {
         method: 'DELETE'
       });
       const data = await res.json();

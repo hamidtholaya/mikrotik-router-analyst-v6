@@ -12,8 +12,12 @@ import {
   Loader2, 
   FileText,
   FileCheck,
-  ShieldCheck
+  ShieldCheck,
+  Smartphone,
+  Globe,
+  Wifi
 } from 'lucide-react';
+import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
 
 export default function SettingsPage() {
   const [activeDb, setActiveDb] = useState(null);
@@ -23,17 +27,22 @@ export default function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [backendUrl, setBackendUrlState] = useState('');
+  const [isMobileEnv, setIsMobileEnv] = useState(false);
+  const [urlSavedMessage, setUrlSavedMessage] = useState(false);
 
   useEffect(() => {
     fetchData();
+    setIsMobileEnv(isNativeMobile());
+    setBackendUrlState(getApiBaseUrl());
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [syncRes, backupRes] = await Promise.all([
-        fetch('/api/userman/sync'),
-        fetch('/api/userman/backup')
+        apiFetch('/api/userman/sync'),
+        apiFetch('/api/userman/backup')
       ]);
 
       const syncData = await syncRes.json();
@@ -48,13 +57,21 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveBackendUrl = (e) => {
+    e.preventDefault();
+    setApiBaseUrl(backendUrl);
+    setUrlSavedMessage(true);
+    setTimeout(() => setUrlSavedMessage(false), 3000);
+    fetchData();
+  };
+
   const handleReloadActiveDb = async () => {
     setSyncing(true);
     setMessage(null);
     setError(null);
 
     try {
-      const res = await fetch('/api/userman/sync', { method: 'POST' });
+      const res = await apiFetch('/api/userman/sync', { method: 'POST' });
       const data = await res.json();
 
       if (data.success) {
@@ -76,7 +93,7 @@ export default function SettingsPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/userman/backup', { method: 'POST' });
+      const res = await apiFetch('/api/userman/backup', { method: 'POST' });
       const data = await res.json();
 
       if (data.success) {
@@ -255,6 +272,65 @@ export default function SettingsPage() {
             )}
           </div>
 
+        </div>
+
+        {/* Mobile & Network Server Card */}
+        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Smartphone style={{ color: 'var(--accent-emerald)', width: '22px', height: '22px' }} />
+              <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--text-main)' }}>Mobile & Network Connection</h2>
+            </div>
+            <span className={`badge ${isMobileEnv ? 'badge-success' : 'badge-warning'}`}>
+              {isMobileEnv ? 'Capacitor Android Native' : 'Web Browser Mode'}
+            </span>
+          </div>
+
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Configure how the mobile application reaches your MikroTik server. When installed as an Android APK, you can connect directly to your local server host or router relay.
+          </p>
+
+          <form onSubmit={handleSaveBackendUrl} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                Server Host / API Endpoint
+              </label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Globe style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: 'var(--text-dim)' }} />
+                  <input
+                    type="text"
+                    value={backendUrl}
+                    onChange={(e) => setBackendUrlState(e.target.value)}
+                    placeholder="e.g. http://192.168.1.50:3000 or leave blank for local"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px 10px 38px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.9rem',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', whiteSpace: 'nowrap' }}>
+                  Save Endpoint
+                </button>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                Leave blank if accessing via browser on the same host (relative paths). Set to <code style={{ color: 'var(--accent-cyan)' }}>http://[IP]:3000</code> when using the standalone Android APK.
+              </span>
+            </div>
+
+            {urlSavedMessage && (
+              <div style={{ color: 'var(--accent-emerald)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 style={{ width: '14px', height: '14px' }} />
+                Server endpoint saved successfully!
+              </div>
+            )}
+          </form>
         </div>
 
       </div>

@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import { apiFetch } from '../../lib/apiClient';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -55,7 +56,7 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/dashboard/query', {
+      const res = await apiFetch('/api/dashboard/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

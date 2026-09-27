@@ -19,6 +19,7 @@ import {
   Sparkles,
   Save
 } from 'lucide-react';
+import { apiFetch } from '../lib/apiClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -73,7 +74,7 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/mikrotik/test', {
+      const res = await apiFetch('/api/mikrotik/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -98,7 +99,7 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -116,6 +117,14 @@ export default function LoginPage() {
         } else {
           localStorage.removeItem('mikrotik_saved_creds');
         }
+
+        // Store session for client and native mobile app
+        localStorage.setItem('mikrotik_session', JSON.stringify(data.session || {
+          user: formData.user,
+          host: formData.host,
+          timestamp: Date.now()
+        }));
+
         router.push('/dashboard');
         router.refresh();
       } else {

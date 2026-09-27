@@ -1,0 +1,9 @@
+{
+  "appId": "com.routeranalyst.mikrotik",
+  "appName": "MikroTik Analyst",
+  "webDir": "out",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
