@@ -287,13 +287,17 @@ export default function SettingsPage() {
           </div>
 
           <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Configure how the mobile application reaches your MikroTik server. When installed as an Android APK, you can connect directly to your local server host or router relay.
+            {isMobileEnv ? (
+              <>Running in <strong>100% Standalone Native Mode</strong>. Your phone communicates directly with MikroTik via raw TCP sockets (port 8728) and syncs <code style={{ color: 'var(--accent-cyan)' }}>user-manager/sqldb</code> via FTP directly into device storage with on-device SQLite. No PC server required.</>
+            ) : (
+              <>Manage backend API endpoints or use default local Next.js routing.</>
+            )}
           </p>
 
           <form onSubmit={handleSaveBackendUrl} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-muted)' }}>
-                Server Host / API Endpoint
+                Optional Custom Server Relay (Leave blank for direct standalone mode)
               </label>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
@@ -302,7 +306,7 @@ export default function SettingsPage() {
                     type="text"
                     value={backendUrl}
                     onChange={(e) => setBackendUrlState(e.target.value)}
-                    placeholder="e.g. http://192.168.1.50:3000 or leave blank for local"
+                    placeholder="Leave blank for Direct Standalone Phone Mode"
                     style={{
                       width: '100%',
                       padding: '10px 14px 10px 38px',
@@ -316,11 +320,11 @@ export default function SettingsPage() {
                   />
                 </div>
                 <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', whiteSpace: 'nowrap' }}>
-                  Save Endpoint
+                  Save
                 </button>
               </div>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
-                Leave blank if accessing via browser on the same host (relative paths). Set to <code style={{ color: 'var(--accent-cyan)' }}>http://[IP]:3000</code> when using the standalone Android APK.
+                Leave blank to run 100% standalone directly on your mobile device.
               </span>
             </div>
 
