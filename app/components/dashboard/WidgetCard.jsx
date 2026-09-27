@@ -14,6 +14,9 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
+  ArrowRightLeft,
+  Trash2,
   Users,
   Wifi,
   Download,
@@ -94,10 +97,21 @@ ChartJS.register(
   Legend
 );
 
-export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRight, onEditClick, onDeleteClick }) {
+export default function WidgetCard({ 
+  item, 
+  isFirst, 
+  isLast, 
+  onMoveLeft, 
+  onMoveRight, 
+  onEditClick, 
+  onDeleteClick,
+  dashboards = [],
+  onMoveClick
+}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     fetchQueryResult();
@@ -285,6 +299,9 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
     }
   };
 
+  const CardIcon = (item.icon && ICON_MAP[item.icon]) ? ICON_MAP[item.icon] : Activity;
+  const theme = COLOR_THEMES[item.color] || COLOR_THEMES.cyan;
+
   return (
     <div 
       className={`glass-panel ${item.type === 'stat_card' ? 'stat-card-widget' : ''}`} 
@@ -304,7 +321,7 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
       {/* Widget Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-          {item.type === 'stat_card' && <Activity style={{ width: '18px', height: '18px', color: 'var(--accent-cyan)', flexShrink: 0 }} />}
+          {item.type === 'stat_card' && <CardIcon style={{ width: '18px', height: '18px', color: theme.text, flexShrink: 0 }} />}
           {item.type === 'table' && <TableIcon style={{ width: '18px', height: '18px', color: 'var(--accent-purple)', flexShrink: 0 }} />}
           {item.type === 'chart' && <BarChart3 style={{ width: '18px', height: '18px', color: 'var(--accent-emerald)', flexShrink: 0 }} />}
           
@@ -320,91 +337,154 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          {/* Quick Reorder Arrow Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(125,125,125,0.08)', borderRadius: '6px', padding: '2px' }}>
-            <button
-              onClick={() => onMoveLeft && onMoveLeft(item.id)}
-              disabled={isFirst}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: isFirst ? 'var(--text-dim)' : 'var(--text-main)',
-                cursor: isFirst ? 'not-allowed' : 'pointer',
-                padding: '3px 4px',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: isFirst ? 0.3 : 1
-              }}
-              title="Move position left"
-            >
-              <ChevronLeft style={{ width: '15px', height: '15px' }} />
-            </button>
-
-            <button
-              onClick={() => onMoveRight && onMoveRight(item.id)}
-              disabled={isLast}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: isLast ? 'var(--text-dim)' : 'var(--text-main)',
-                cursor: isLast ? 'not-allowed' : 'pointer',
-                padding: '3px 4px',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: isLast ? 0.3 : 1
-              }}
-              title="Move position right"
-            >
-              <ChevronRight style={{ width: '15px', height: '15px' }} />
-            </button>
-          </div>
-
           {/* Refresh Button */}
           <button 
             onClick={fetchQueryResult} 
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: 'var(--text-dim)', 
+              cursor: 'pointer', 
+              padding: '6px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
             title="Refresh query data"
           >
             <RefreshCw style={{ width: '14px', height: '14px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
 
-          {/* Edit Button */}
-          <button 
-            onClick={() => onEditClick(item)} 
-            style={{ 
-              background: 'rgba(139, 92, 246, 0.1)', 
-              border: '1px solid rgba(139, 92, 246, 0.25)', 
-              color: 'var(--accent-purple)', 
-              cursor: 'pointer', 
-              padding: '4px 6px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title="Edit item configuration"
-          >
-            <Edit3 style={{ width: '14px', height: '14px' }} />
-          </button>
+          {/* Action Button (More Options Dropdown) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMenu(prev => !prev)}
+              style={{
+                background: showMenu ? 'var(--bg-secondary)' : 'rgba(125,125,125,0.08)',
+                border: '1px solid',
+                borderColor: showMenu ? 'var(--border-active)' : 'transparent',
+                color: showMenu ? 'var(--text-main)' : 'var(--text-dim)',
+                cursor: 'pointer',
+                padding: '5px 7px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              title="Widget actions"
+            >
+              <MoreVertical style={{ width: '15px', height: '15px' }} />
+            </button>
 
-          {/* X Remove Button */}
-          <button 
-            onClick={() => onDeleteClick(item)} 
-            style={{ 
-              background: 'rgba(244, 63, 94, 0.1)', 
-              border: '1px solid rgba(244, 63, 94, 0.25)', 
-              color: 'var(--accent-rose)', 
-              cursor: 'pointer', 
-              padding: '4px 6px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title="Remove item from dashboard"
-          >
-            <X style={{ width: '14px', height: '14px' }} />
-          </button>
+            {/* Dropdown Menu */}
+            {showMenu && (
+              <>
+                <div 
+                  style={{ position: 'fixed', inset: 0, zIndex: 999 }} 
+                  onClick={() => setShowMenu(false)} 
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 'calc(100% + 6px)',
+                    zIndex: 1000,
+                    minWidth: '175px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4)',
+                    backdropFilter: 'blur(16px)',
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  {/* Edit Widget */}
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      if (onEditClick) onEditClick(item);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-main)',
+                      fontSize: '0.84rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Edit3 style={{ width: '14px', height: '14px', color: 'var(--accent-purple)' }} />
+                    Edit Widget
+                  </button>
+
+                  {/* Move to Dashboard (Only if more than 1 dashboard) */}
+                  {dashboards && dashboards.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        if (onMoveClick) onMoveClick(item);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-main)',
+                        fontSize: '0.84rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <ArrowRightLeft style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)' }} />
+                      Move to Dashboard
+                    </button>
+                  )}
+
+                  <div style={{ height: '1px', background: 'var(--border-color)', margin: '2px 0' }} />
+
+                  {/* Delete Widget */}
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      if (onDeleteClick) onDeleteClick(item);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--accent-rose)',
+                      fontSize: '0.84rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Trash2 style={{ width: '14px', height: '14px' }} />
+                    Delete Widget
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -479,33 +559,17 @@ export default function WidgetCard({ item, isFirst, isLast, onMoveLeft, onMoveRi
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{
-                    fontSize: '2.1rem',
-                    fontWeight: '800',
-                    color: theme.text,
-                    letterSpacing: '-0.03em',
-                    lineHeight: 1.1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {item.prefix || ''}{rawVal}{item.suffix ? ` ${item.suffix}` : ''}
-                  </div>
-                  <div style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: theme.bg,
-                    border: `1px solid ${theme.border}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: theme.text,
-                    flexShrink: 0
-                  }}>
-                    <CardIcon style={{ width: '20px', height: '20px' }} />
-                  </div>
+                <div style={{
+                  fontSize: '2.2rem',
+                  fontWeight: '800',
+                  color: theme.text,
+                  letterSpacing: '-0.03em',
+                  lineHeight: 1.15,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {item.prefix || ''}{rawVal}{item.suffix ? ` ${item.suffix}` : ''}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>

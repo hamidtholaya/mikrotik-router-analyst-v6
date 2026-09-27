@@ -327,6 +327,7 @@ async function handleNativeRequest(endpoint, options) {
     if (method === 'GET') {
       return new Response(JSON.stringify({ 
         success: true, 
+        config: configData,
         dashboards: configData.dashboards, 
         activeDashboardId: configData.activeDashboardId 
       }), {
@@ -388,6 +389,50 @@ async function handleNativeRequest(endpoint, options) {
           dashboards: configData.dashboards,
           activeDashboardId: configData.activeDashboardId
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // 3b. Move Widget between Dashboards
+      if (body.action === 'move_widget') {
+        const { itemId, fromDashboardId, toDashboardId } = body;
+        const sourceDash = configData.dashboards.find(d => d.id === fromDashboardId);
+        const targetDash = configData.dashboards.find(d => d.id === toDashboardId);
+
+        if (sourceDash && targetDash) {
+          const itemIdx = sourceDash.items.findIndex(item => item.id === itemId);
+          if (itemIdx !== -1) {
+            const [item] = sourceDash.items.splice(itemIdx, 1);
+            targetDash.items.push(item);
+            saveDashboardsConfig(configData);
+            return new Response(JSON.stringify({
+              success: true,
+              message: 'Widget moved successfully.',
+              dashboards: configData.dashboards,
+              activeDashboardId: configData.activeDashboardId
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+        }
+        return new Response(JSON.stringify({ success: false, error: 'Widget or dashboard not found' }), { status: 400 });
+      }
+
+      // 3c. Import Full configs.json
+      if (body.action === 'import_config') {
+        if (body.configData) {
+          let imported = body.configData;
+          if (!imported.dashboards && Array.isArray(imported)) {
+            imported = {
+              activeDashboardId: 'dash_main',
+              dashboards: [{ id: 'dash_main', name: 'General Overview', icon: 'LayoutDashboard', items: imported }]
+            };
+          }
+          configData = imported;
+          saveDashboardsConfig(configData);
+          return new Response(JSON.stringify({
+            success: true,
+            dashboards: configData.dashboards,
+            activeDashboardId: configData.activeDashboardId
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ success: false, error: 'Invalid config data' }), { status: 400 });
       }
 
       // 4. Add Widget to Dashboard

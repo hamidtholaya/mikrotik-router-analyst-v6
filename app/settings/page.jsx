@@ -17,7 +17,8 @@ import {
   Globe,
   Wifi,
   Upload,
-  FolderDown
+  FolderDown,
+  LayoutDashboard
 } from 'lucide-react';
 import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
 
@@ -28,12 +29,15 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [exportingConfig, setExportingConfig] = useState(false);
+  const [importingConfig, setImportingConfig] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [backendUrl, setBackendUrlState] = useState('');
   const [isMobileEnv, setIsMobileEnv] = useState(false);
   const [urlSavedMessage, setUrlSavedMessage] = useState(false);
   const fileInputRef = useRef(null);
+  const configFileInputRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -183,6 +187,92 @@ export default function SettingsPage() {
     } catch (e) {
       setError('Export failed: ' + e.message);
     }
+  };
+
+  const handleExportConfigsJson = async () => {
+    setExportingConfig(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await apiFetch('/api/dashboard/config');
+      const data = await res.json();
+      if (data.success && (data.config || data.dashboards)) {
+        const configToExport = data.config || {
+          activeDashboardId: data.activeDashboardId || 'dash_main',
+          dashboards: data.dashboards
+        };
+        const jsonStr = JSON.stringify(configToExport, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.download = `configs_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setMessage('Successfully exported configs.json backup file!');
+        setTimeout(() => setMessage(null), 4000);
+      } else {
+        setError(data.error || 'Failed to read configuration data.');
+      }
+    } catch (err) {
+      setError('Export failed: ' + err.message);
+    } finally {
+      setExportingConfig(false);
+    }
+  };
+
+  const handleImportConfigsJson = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    setImportingConfig(true);
+    setMessage(null);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || (typeof parsed !== 'object')) {
+          throw new Error('File content is not valid JSON.');
+        }
+
+        // Validate structure: must have dashboards array or items
+        if (!parsed.dashboards && !Array.isArray(parsed)) {
+          throw new Error('Invalid configs format: Expected "dashboards" array.');
+        }
+
+        const res = await apiFetch('/api/dashboard/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'import_config',
+            configData: parsed
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setMessage(`Successfully imported "${file.name}"! Dashboards and widget configurations restored.`);
+          setTimeout(() => setMessage(null), 5000);
+        } else {
+          setError(data.error || 'Failed to import configuration file.');
+        }
+      } catch (err) {
+        setError('Error importing configs.json: ' + (err.message || 'Invalid JSON file'));
+      } finally {
+        setImportingConfig(false);
+        if (configFileInputRef.current) configFileInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setError('Failed to read file from device storage.');
+      setImportingConfig(false);
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -404,6 +494,78 @@ export default function SettingsPage() {
             )}
           </div>
 
+        </div>
+
+        {/* Dashboard Configurations (configs.json) Card */}
+        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <LayoutDashboard style={{ color: 'var(--accent-cyan)', width: '22px', height: '22px' }} />
+              <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--text-main)' }}>Dashboard Configurations</h2>
+            </div>
+            <span className="badge badge-success">configs.json</span>
+          </div>
+
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Export and import all your dashboard tabs, custom widgets, SQL queries, and color themes. Back up your layout or easily transfer it between devices.
+          </p>
+
+          <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Config File:</span>
+              <span style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>data/configs.json</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Scope:</span>
+              <span style={{ color: 'var(--accent-cyan)', fontWeight: '600' }}>All Dashboards & Widgets</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Compatibility:</span>
+              <span style={{ color: 'var(--accent-emerald)', fontWeight: '600' }}>Web & Mobile App</span>
+            </div>
+          </div>
+
+          <input
+            type="file"
+            ref={configFileInputRef}
+            onChange={handleImportConfigsJson}
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: 'auto' }}>
+            <button
+              onClick={handleExportConfigsJson}
+              disabled={exportingConfig || importingConfig}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.85rem', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              title="Download configs.json backup file"
+            >
+              {exportingConfig ? (
+                <Loader2 style={{ width: '15px', height: '15px', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <FolderDown style={{ width: '15px', height: '15px', color: 'var(--accent-cyan)' }} />
+              )}
+              Export Config
+            </button>
+
+            <button
+              onClick={() => configFileInputRef.current?.click()}
+              disabled={importingConfig || exportingConfig}
+              className="btn btn-primary"
+              style={{ fontSize: '0.85rem', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              title="Import a configs.json file from storage"
+            >
+              {importingConfig ? (
+                <Loader2 style={{ width: '15px', height: '15px', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Upload style={{ width: '15px', height: '15px' }} />
+              )}
+              Import Config
+            </button>
+          </div>
         </div>
 
         {/* Mobile & Network Server Card */}

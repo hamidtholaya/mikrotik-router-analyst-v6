@@ -6,7 +6,9 @@ import {
   deleteDashboardTab, 
   addDashboardItem, 
   updateDashboardItem, 
-  deleteDashboardItem 
+  deleteDashboardItem,
+  moveDashboardItem,
+  importDashboardsConfig
 } from '../../../lib/config-store';
 
 export async function GET() {
@@ -14,6 +16,7 @@ export async function GET() {
     const config = getDashboardsData();
     return NextResponse.json({ 
       success: true, 
+      config,
       dashboards: config.dashboards, 
       activeDashboardId: config.activeDashboardId 
     });
@@ -57,6 +60,32 @@ export async function POST(request) {
       }
       return NextResponse.json({
         success: true,
+        dashboards: res.config.dashboards,
+        activeDashboardId: res.config.activeDashboardId
+      });
+    }
+
+    // 1b. Move Widget between Dashboards
+    if (body.action === 'move_widget') {
+      const { itemId, fromDashboardId, toDashboardId } = body;
+      const res = moveDashboardItem(itemId, fromDashboardId, toDashboardId);
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Widget moved successfully.',
+        dashboards: res.config.dashboards,
+        activeDashboardId: res.config.activeDashboardId
+      });
+    }
+
+    // 1c. Import Full configs.json
+    if (body.action === 'import_config') {
+      const res = importDashboardsConfig(body.configData);
+      return NextResponse.json({
+        success: true,
+        message: 'Configuration imported successfully.',
         dashboards: res.config.dashboards,
         activeDashboardId: res.config.activeDashboardId
       });

@@ -248,3 +248,31 @@ export function reorderDashboardItems(orderedIds, dashboardId) {
   saveConfig(config);
   return config;
 }
+
+export function moveDashboardItem(itemId, fromDashboardId, toDashboardId) {
+  const config = readConfig();
+  const sourceDash = config.dashboards.find(d => d.id === fromDashboardId);
+  const targetDash = config.dashboards.find(d => d.id === toDashboardId);
+
+  if (!sourceDash || !targetDash) {
+    return { success: false, error: 'Source or target dashboard not found.' };
+  }
+
+  const itemIdx = sourceDash.items.findIndex(item => item.id === itemId);
+  if (itemIdx === -1) {
+    return { success: false, error: 'Widget not found in source dashboard.' };
+  }
+
+  const [item] = sourceDash.items.splice(itemIdx, 1);
+  targetDash.items.push(item);
+  saveConfig(config);
+
+  return { success: true, config };
+}
+
+export function importDashboardsConfig(importedData) {
+  const normalized = normalizeConfig(importedData);
+  saveConfig(normalized);
+  return { success: true, config: normalized };
+}
+

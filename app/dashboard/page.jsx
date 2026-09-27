@@ -22,6 +22,7 @@ import ReorderModal from '../components/dashboard/ReorderModal';
 import DashboardTabs from '../components/dashboard/DashboardTabs';
 import DashboardTabModal from '../components/dashboard/DashboardTabModal';
 import ConfirmDeleteTabModal from '../components/dashboard/ConfirmDeleteTabModal';
+import MoveWidgetModal from '../components/dashboard/MoveWidgetModal';
 import { apiFetch } from '../lib/apiClient';
 
 const ACTIVE_DASHBOARD_STORAGE_KEY = 'mikrotik_active_dashboard_id';
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [movingWidget, setMovingWidget] = useState(null);
 
   // Dashboard Tab Modals
   const [tabModalMode, setTabModalMode] = useState('create'); // 'create' | 'rename'
@@ -329,6 +331,27 @@ export default function DashboardPage() {
     }
   };
 
+  const handleMoveWidgetToDashboard = async (targetItem, targetDashboardId) => {
+    try {
+      const res = await apiFetch('/api/dashboard/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'move_widget',
+          itemId: targetItem.id,
+          fromDashboardId: activeDashboard.id,
+          toDashboardId: targetDashboardId
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.dashboards) {
+        setDashboards(data.dashboards);
+      }
+    } catch (err) {
+      console.error('Error moving widget to dashboard:', err);
+    }
+  };
+
   const syncTime = formatRelativeTime(activeDb?.lastModified);
 
   return (
@@ -559,6 +582,9 @@ export default function DashboardPage() {
               onMoveRight={handleMoveRight}
               onEditClick={(targetItem) => handleOpenEditModal(targetItem)}
               onDeleteClick={(targetItem) => setDeletingItem(targetItem)}
+              dashboards={dashboards}
+              currentDashboardId={activeDashboard.id}
+              onMoveClick={(targetItem) => setMovingWidget(targetItem)}
             />
           ))}
         </div>
@@ -649,6 +675,16 @@ export default function DashboardPage() {
         onClose={() => setDeletingTab(null)}
         onConfirm={handleConfirmDeleteTab}
         deleting={isDeletingTab}
+      />
+
+      {/* Move Widget Modal */}
+      <MoveWidgetModal
+        isOpen={!!movingWidget}
+        item={movingWidget}
+        dashboards={dashboards}
+        currentDashboardId={activeDashboard.id}
+        onClose={() => setMovingWidget(null)}
+        onMove={handleMoveWidgetToDashboard}
       />
 
     </div>
