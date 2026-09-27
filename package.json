@@ -1,0 +1,23 @@
+{
+  "name": "mikrotik-router-analyst-v6",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5",
+    "chart.js": "^4.4.3",
+    "knex": "^3.1.0",
+    "lucide-react": "^0.427.0",
+    "next": "^14.2.5",
+    "node-routeros": "^1.6.0",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
+    "sqlite3": "^5.1.7"
+  }
+}
