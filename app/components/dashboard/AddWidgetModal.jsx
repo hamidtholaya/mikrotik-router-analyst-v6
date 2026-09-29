@@ -27,7 +27,8 @@ import {
   Clock,
   Radio,
   Zap,
-  Sparkles
+  Sparkles,
+  Bookmark
 } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
 
@@ -46,7 +47,15 @@ const AVAILABLE_ICONS = [
   { name: 'Radio', icon: Radio },
   { name: 'Layers', icon: Layers },
   { name: 'Zap', icon: Zap },
-  { name: 'Database', icon: Database }
+  { name: 'Database', icon: Database },
+  { name: 'Bookmark', icon: Bookmark }
+];
+
+const GRAYSCALE_COLORS = [
+  { key: 'zinc', label: 'Titanium Zinc (Eye-Comfort)', border: '#71717a', bg: 'rgba(113, 113, 122, 0.15)' },
+  { key: 'graphite', label: 'Charcoal Graphite (Eye-Comfort)', border: '#475569', bg: 'rgba(71, 85, 105, 0.15)' },
+  { key: 'stone', label: 'Warm Stone (Eye-Comfort)', border: '#78716c', bg: 'rgba(120, 113, 108, 0.15)' },
+  { key: 'steel', label: 'Corporate Steel (Eye-Comfort)', border: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' }
 ];
 
 const CALM_COLORS = [
@@ -68,14 +77,15 @@ const VIBRANT_COLORS = [
   { key: 'blue', label: 'Blue', border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' }
 ];
 
-const AVAILABLE_COLORS = [...CALM_COLORS, ...VIBRANT_COLORS];
+const AVAILABLE_COLORS = [...GRAYSCALE_COLORS, ...CALM_COLORS, ...VIBRANT_COLORS];
 
 const QUICK_TEMPLATES = [
   {
     name: 'Total Users',
     type: 'stat_card',
     icon: 'Users',
-    color: 'cyan',
+    color: 'zinc',
+    fontSize: 'standard',
     suffix: 'Users',
     subtitle: 'Total registered user accounts',
     sql: 'SELECT COUNT(*) AS total_users FROM user;'
@@ -84,7 +94,8 @@ const QUICK_TEMPLATES = [
     name: 'Active Hotspot Users',
     type: 'stat_card',
     icon: 'Wifi',
-    color: 'emerald',
+    color: 'sage',
+    fontSize: 'standard',
     suffix: 'Active',
     subtitle: 'Accounts currently enabled',
     sql: 'SELECT COUNT(*) AS active_users FROM user WHERE disabled = 0;'
@@ -93,10 +104,19 @@ const QUICK_TEMPLATES = [
     name: 'Total Sessions Count',
     type: 'stat_card',
     icon: 'Radio',
-    color: 'purple',
+    color: 'graphite',
+    fontSize: 'standard',
     suffix: 'Sessions',
     subtitle: 'Historical session connections',
     sql: 'SELECT COUNT(*) AS total_sessions FROM usermgr_sessions;'
+  },
+  {
+    name: 'Network & Hotspot Activity',
+    type: 'section_divider',
+    icon: 'Wifi',
+    color: 'zinc',
+    sectionStyle: 'line',
+    subtitle: 'Real-time client connections and hotspot statistics'
   },
   {
     name: 'Top 5 Users by Download',
@@ -119,6 +139,8 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
     chartType: 'bar',
     icon: 'Activity',
     color: 'cyan',
+    fontSize: 'standard',
+    sectionStyle: 'line',
     prefix: '',
     suffix: '',
     subtitle: '',
@@ -144,6 +166,8 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
         chartType: initialData.chartType || 'bar',
         icon: initialData.icon || 'Activity',
         color: initialData.color || 'cyan',
+        fontSize: initialData.fontSize || 'standard',
+        sectionStyle: initialData.sectionStyle || 'line',
         prefix: initialData.prefix || '',
         suffix: initialData.suffix || '',
         subtitle: initialData.subtitle || '',
@@ -153,10 +177,10 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
         chartMode: initialData.chartMode || 'grouped',
         size: initialData.size || 'half',
         dbPath: initialData.dbPath || 'data/userman_active.db',
-        sql: initialData.sql || 'SELECT * FROM user LIMIT 10;'
+        sql: initialData.sql || (initialData.type === 'section_divider' ? '' : 'SELECT * FROM user LIMIT 10;')
       });
 
-      if (initialData.sql) {
+      if (initialData.sql && initialData.type !== 'section_divider') {
         runTestQuery(initialData.sql, initialData.dbPath || 'data/userman_active.db');
       } else {
         setTestResult(null);
@@ -169,6 +193,8 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
         chartType: 'bar',
         icon: 'Activity',
         color: 'cyan',
+        fontSize: 'standard',
+        sectionStyle: 'line',
         prefix: '',
         suffix: '',
         subtitle: '',
@@ -231,12 +257,20 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
       type: tpl.type,
       icon: tpl.icon || prev.icon,
       color: tpl.color || prev.color,
+      fontSize: tpl.fontSize || prev.fontSize || 'standard',
+      sectionStyle: tpl.sectionStyle || prev.sectionStyle || 'line',
+      size: tpl.type === 'section_divider' ? 'full' : (tpl.size || prev.size),
       prefix: tpl.prefix || '',
       suffix: tpl.suffix || '',
       subtitle: tpl.subtitle || '',
-      sql: tpl.sql
+      sql: tpl.sql || ''
     }));
-    runTestQuery(tpl.sql, formData.dbPath);
+    if (tpl.sql && tpl.type !== 'section_divider') {
+      runTestQuery(tpl.sql, formData.dbPath);
+    } else {
+      setTestResult(null);
+      setTestError(null);
+    }
   };
 
   const toggleYAxisCol = (colName) => {
@@ -255,6 +289,8 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
 
     onSave({
       ...formData,
+      sql: formData.type === 'section_divider' ? '' : formData.sql,
+      size: formData.type === 'section_divider' ? (formData.size || 'full') : formData.size,
       dashboardId
     });
     onClose();
@@ -391,11 +427,19 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
               <select 
                 className="input-field"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setFormData(prev => ({
+                    ...prev,
+                    type: newType,
+                    size: newType === 'section_divider' ? 'full' : prev.size
+                  }));
+                }}
               >
                 <option value="stat_card">Stat Card (Single Metric Summary)</option>
                 <option value="table">Data Table (Multi-row Grid)</option>
                 <option value="chart">Chart Graph (Bar / Line / Pie / Doughnut)</option>
+                <option value="section_divider">Section Header / Divider (Organizer)</option>
               </select>
             </div>
 
@@ -460,6 +504,42 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
                   <span>Stat Card Color Theme</span>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Calm tones or vibrant accents</span>
                 </label>
+
+                {/* Eye-Comfort Grayscale Monochrome */}
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>👁️ Eye-Comfort & Neutral Monochrome:</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {GRAYSCALE_COLORS.map(c => {
+                      const isSelected = formData.color === c.key;
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, color: c.key })}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            background: isSelected ? c.bg : 'var(--bg-input)',
+                            border: isSelected ? `2px solid ${c.border}` : '1px solid var(--border-color)',
+                            color: isSelected ? 'var(--text-main)' : 'var(--text-muted)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.border }} />
+                          {c.label.replace(' (Eye-Comfort)', '')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Calm & Muted Colors */}
                 <div style={{ marginBottom: '10px' }}>
@@ -569,6 +649,181 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
                   onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                 />
               </div>
+
+              {/* Stat Number Font Size Selector */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Metric Number Font Size</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>From compact to giant hero</span>
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {[
+                    { key: 'compact', label: 'Compact', desc: '1.5rem' },
+                    { key: 'standard', label: 'Standard', desc: '2.2rem' },
+                    { key: 'large', label: 'Large', desc: '2.75rem' },
+                    { key: 'hero', label: 'Hero', desc: '3.3rem' }
+                  ].map(sizeOpt => {
+                    const isSelected = (formData.fontSize || 'standard') === sizeOpt.key;
+                    return (
+                      <button
+                        key={sizeOpt.key}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, fontSize: sizeOpt.key })}
+                        style={{
+                          padding: '7px 6px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: isSelected ? '700' : '500',
+                          cursor: 'pointer',
+                          background: isSelected ? 'rgba(6, 182, 212, 0.18)' : 'var(--bg-input)',
+                          border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                          color: isSelected ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                          textAlign: 'center',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>{sizeOpt.label}</div>
+                        <div style={{ fontSize: '0.68rem', opacity: 0.7 }}>{sizeOpt.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION DIVIDER CUSTOMIZATION OPTIONS */}
+          {formData.type === 'section_divider' && (
+            <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-active)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Bookmark style={{ width: '15px', height: '15px' }} />
+                Section Divider & Organizer Styling
+              </div>
+
+              {/* Style selector: Line, Banner, Minimal */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '6px' }}>Divider Style</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {[
+                    { key: 'line', label: 'Accent Line', desc: 'Title with horizontal separator' },
+                    { key: 'banner', label: 'Solid Banner', desc: 'Framed card container with pill badge' },
+                    { key: 'minimal', label: 'Minimalist', desc: 'Clean typographic break' }
+                  ].map(styleOpt => {
+                    const isSelected = (formData.sectionStyle || 'line') === styleOpt.key;
+                    return (
+                      <button
+                        key={styleOpt.key}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, sectionStyle: styleOpt.key })}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          background: isSelected ? 'rgba(6, 182, 212, 0.15)' : 'var(--bg-input)',
+                          border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                          color: isSelected ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                          textAlign: 'left',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ fontWeight: '700', fontSize: '0.82rem', marginBottom: '2px' }}>{styleOpt.label}</div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.75 }}>{styleOpt.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Icon Selector for Section */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '6px' }}>Section Icon</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {AVAILABLE_ICONS.map((item, idx) => {
+                    const IconComp = item.icon;
+                    const isSelected = formData.icon === item.name;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: item.name })}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          background: isSelected ? 'rgba(6, 182, 212, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                          border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                          color: isSelected ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title={item.name}
+                      >
+                        <IconComp style={{ width: '18px', height: '18px' }} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Color Accent Selector */}
+              <div>
+                <label className="label-text" style={{ marginBottom: '8px' }}>Section Color Theme</label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {[...GRAYSCALE_COLORS, ...CALM_COLORS, ...VIBRANT_COLORS].map(c => {
+                    const isSelected = formData.color === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, color: c.key })}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '8px',
+                          fontSize: '0.76rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          background: isSelected ? c.bg : 'var(--bg-input)',
+                          border: isSelected ? `2px solid ${c.border}` : '1px solid var(--border-color)',
+                          color: isSelected ? c.border : 'var(--text-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.border }} />
+                        {c.label.split(' (')[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Subtitle / Description */}
+              <div>
+                <label className="label-text">Section Description / Subtitle</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Real-time client connections and hotspot statistics"
+                  value={formData.subtitle}
+                  onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                />
+              </div>
+
+              <div style={{
+                background: 'rgba(6, 182, 212, 0.08)',
+                border: '1px solid rgba(6, 182, 212, 0.2)',
+                borderRadius: 'var(--radius-md)',
+                padding: '10px 14px',
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                lineHeight: 1.4
+              }}>
+                <strong style={{ color: 'var(--accent-cyan)' }}>Zero SQL Queries:</strong> Section dividers do not query any database and render instantly with zero network load.
+              </div>
             </div>
           )}
 
@@ -668,94 +923,99 @@ export default function AddWidgetModal({ isOpen, initialData, onClose, onSave, d
             </div>
           )}
 
-          {/* Database Path */}
-          <div>
-            <label className="label-text">Database Target</label>
-            <div style={{ position: 'relative' }}>
-              <Database style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', color: 'var(--accent-cyan)' }} />
-              <input 
-                type="text" 
-                className="input-field" 
-                style={{ paddingLeft: '38px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
-                placeholder="data/userman_active.db"
-                value={formData.dbPath}
-                onChange={(e) => setFormData({ ...formData, dbPath: e.target.value })}
-              />
-            </div>
-          </div>
+          {/* SQL & Database Configuration (Only for metrics, charts, and tables) */}
+          {formData.type !== 'section_divider' && (
+            <>
+              {/* Database Path */}
+              <div>
+                <label className="label-text">Database Target</label>
+                <div style={{ position: 'relative' }}>
+                  <Database style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', color: 'var(--accent-cyan)' }} />
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    style={{ paddingLeft: '38px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                    placeholder="data/userman_active.db"
+                    value={formData.dbPath}
+                    onChange={(e) => setFormData({ ...formData, dbPath: e.target.value })}
+                  />
+                </div>
+              </div>
 
-          {/* SQL Textarea */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label className="label-text" style={{ marginBottom: 0 }}>
-                SQL Statement <span style={{ color: 'var(--accent-rose)' }}>*</span>
-              </label>
+              {/* SQL Textarea */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label className="label-text" style={{ marginBottom: 0 }}>
+                    SQL Statement <span style={{ color: 'var(--accent-rose)' }}>*</span>
+                  </label>
 
-              <button
-                type="button"
-                onClick={() => runTestQuery()}
-                disabled={testing}
-                className="btn btn-secondary"
-                style={{ padding: '4px 12px', fontSize: '0.78rem' }}
-              >
-                {testing ? (
-                  <>
-                    <Loader2 style={{ width: '13px', height: '13px', animation: 'spin 1s linear infinite' }} />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play style={{ width: '13px', height: '13px', color: 'var(--accent-cyan)' }} />
-                    Test Query
-                  </>
-                )}
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => runTestQuery()}
+                    disabled={testing}
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 12px', fontSize: '0.78rem' }}
+                  >
+                    {testing ? (
+                      <>
+                        <Loader2 style={{ width: '13px', height: '13px', animation: 'spin 1s linear infinite' }} />
+                        Running...
+                      </>
+                    ) : (
+                      <>
+                        <Play style={{ width: '13px', height: '13px', color: 'var(--accent-cyan)' }} />
+                        Test Query
+                      </>
+                    )}
+                  </button>
+                </div>
 
-            <textarea
-              required
-              rows={3}
-              className="input-field"
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', lineHeight: 1.4 }}
-              placeholder="SELECT COUNT(*) as activeUsers FROM user WHERE disabled = 0;"
-              value={formData.sql}
-              onChange={(e) => setFormData({ ...formData, sql: e.target.value })}
-            />
-          </div>
+                <textarea
+                  required
+                  rows={3}
+                  className="input-field"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', lineHeight: 1.4 }}
+                  placeholder="SELECT COUNT(*) as activeUsers FROM user WHERE disabled = 0;"
+                  value={formData.sql}
+                  onChange={(e) => setFormData({ ...formData, sql: e.target.value })}
+                />
+              </div>
 
-          {/* Query Test Results / Error */}
-          {testError && (
-            <div style={{
-              background: 'rgba(244, 63, 94, 0.1)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-              borderRadius: 'var(--radius-md)',
-              padding: '10px 14px',
-              color: 'var(--accent-rose)',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <AlertCircle style={{ width: '16px', height: '16px', shrink: 0 }} />
-              <div>{testError}</div>
-            </div>
-          )}
+              {/* Query Test Results / Error */}
+              {testError && (
+                <div style={{
+                  background: 'rgba(244, 63, 94, 0.1)',
+                  border: '1px solid rgba(244, 63, 94, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '10px 14px',
+                  color: 'var(--accent-rose)',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle style={{ width: '16px', height: '16px', shrink: 0 }} />
+                  <div>{testError}</div>
+                </div>
+              )}
 
-          {testResult && (
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: 'var(--radius-md)',
-              padding: '10px 14px',
-              color: 'var(--accent-emerald)',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <CheckCircle2 style={{ width: '16px', height: '16px', shrink: 0 }} />
-              <div>Query valid! Returned {testResult.rowCount} {testResult.rowCount === 1 ? 'row' : 'rows'}. Columns: {testResult.columns.join(', ')}</div>
-            </div>
+              {testResult && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '10px 14px',
+                  color: 'var(--accent-emerald)',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <CheckCircle2 style={{ width: '16px', height: '16px', shrink: 0 }} />
+                  <div>Query valid! Returned {testResult.rowCount} {testResult.rowCount === 1 ? 'row' : 'rows'}. Columns: {testResult.columns.join(', ')}</div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Modal Actions */}

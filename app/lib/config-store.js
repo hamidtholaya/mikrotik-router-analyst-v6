@@ -158,10 +158,12 @@ export function addDashboardItem(item, dashboardId) {
     yAxisCols: Array.isArray(item.yAxisCols) ? item.yAxisCols : [],
     dualAxis: !!item.dualAxis,
     chartMode: item.chartMode || 'grouped',
-    size: item.size || 'half',
+    size: item.size || (item.type === 'section_divider' ? 'full' : 'half'),
     dbPath: item.dbPath || 'data/userman_active.db',
-    sql: item.sql || 'SELECT 1;',
+    sql: item.sql !== undefined ? item.sql : (item.type === 'section_divider' ? '' : 'SELECT 1;'),
     color: item.color || 'cyan',
+    fontSize: item.fontSize || 'standard',
+    sectionStyle: item.sectionStyle || 'line',
     createdAt: new Date().toISOString()
   };
 
@@ -193,14 +195,45 @@ export function updateDashboardItem(id, updatedData, dashboardId) {
     dualAxis: updatedData.dualAxis !== undefined ? !!updatedData.dualAxis : dash.items[idx].dualAxis,
     chartMode: updatedData.chartMode || dash.items[idx].chartMode || 'grouped',
     size: updatedData.size || dash.items[idx].size,
-    dbPath: updatedData.dbPath || dash.items[idx].dbPath || 'data/userman_active.db',
-    sql: updatedData.sql || dash.items[idx].sql,
+    dbPath: updatedData.dbPath !== undefined ? updatedData.dbPath : dash.items[idx].dbPath,
+    sql: updatedData.sql !== undefined ? updatedData.sql : dash.items[idx].sql,
     color: updatedData.color || dash.items[idx].color,
+    fontSize: updatedData.fontSize || dash.items[idx].fontSize || 'standard',
+    sectionStyle: updatedData.sectionStyle || dash.items[idx].sectionStyle || 'line',
     updatedAt: new Date().toISOString()
   };
 
   saveConfig(config);
   return { item: dash.items[idx], config };
+}
+
+export function duplicateDashboardItem(itemId, dashboardId) {
+  const config = readConfig();
+  const targetId = dashboardId || config.activeDashboardId;
+  const dash = config.dashboards.find(d => d.id === targetId) || config.dashboards[0];
+
+  if (!dash) {
+    return { success: false, error: 'Dashboard not found.' };
+  }
+
+  const itemIdx = dash.items.findIndex(item => item.id === itemId);
+  if (itemIdx === -1) {
+    return { success: false, error: 'Widget not found.' };
+  }
+
+  const original = dash.items[itemIdx];
+  const duplicatedItem = {
+    ...original,
+    id: `dash_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    name: `${original.name} (Copy)`,
+    createdAt: new Date().toISOString()
+  };
+
+  // Insert right after original
+  dash.items.splice(itemIdx + 1, 0, duplicatedItem);
+  saveConfig(config);
+
+  return { success: true, duplicatedItem, config };
 }
 
 export function deleteDashboardItem(id, dashboardId) {

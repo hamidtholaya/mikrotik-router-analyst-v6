@@ -8,6 +8,7 @@ import {
   updateDashboardItem, 
   deleteDashboardItem,
   moveDashboardItem,
+  duplicateDashboardItem,
   importDashboardsConfig
 } from '../../../lib/config-store';
 
@@ -80,7 +81,23 @@ export async function POST(request) {
       });
     }
 
-    // 1c. Import Full configs.json
+    // 1c. Duplicate Widget
+    if (body.action === 'duplicate_widget') {
+      const { itemId, dashboardId } = body;
+      const res = duplicateDashboardItem(itemId, dashboardId);
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        message: `Duplicated widget "${res.duplicatedItem.name}".`,
+        item: res.duplicatedItem,
+        dashboards: res.config.dashboards,
+        activeDashboardId: res.config.activeDashboardId
+      });
+    }
+
+    // 1d. Import Full configs.json
     if (body.action === 'import_config') {
       const res = importDashboardsConfig(body.configData);
       return NextResponse.json({
@@ -92,9 +109,28 @@ export async function POST(request) {
     }
 
     // 2. Add Widget Item Action
-    const { dashboardId, name, type, chartType, icon, prefix, suffix, subtitle, size, dbPath, sql, color } = body;
+    const { 
+      dashboardId, 
+      name, 
+      type, 
+      chartType, 
+      icon, 
+      prefix, 
+      suffix, 
+      subtitle, 
+      size, 
+      dbPath, 
+      sql, 
+      color,
+      fontSize,
+      sectionStyle,
+      xAxisCol,
+      yAxisCols,
+      chartMode,
+      dualAxis
+    } = body;
 
-    if (!name || !sql) {
+    if (!name || (!sql && type !== 'section_divider')) {
       return NextResponse.json(
         { success: false, error: 'Widget Title (name) and SQL Statement are required.' },
         { status: 400 }
@@ -109,10 +145,16 @@ export async function POST(request) {
       prefix, 
       suffix, 
       subtitle, 
-      size, 
+      size: size || (type === 'section_divider' ? 'full' : 'half'), 
       dbPath, 
-      sql, 
-      color 
+      sql: type === 'section_divider' ? '' : sql, 
+      color,
+      fontSize,
+      sectionStyle,
+      xAxisCol,
+      yAxisCols,
+      chartMode,
+      dualAxis
     }, dashboardId);
 
     return NextResponse.json({
@@ -131,7 +173,27 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, dashboardId, name, type, chartType, icon, prefix, suffix, subtitle, size, dbPath, sql, color } = body;
+    const { 
+      id, 
+      dashboardId, 
+      name, 
+      type, 
+      chartType, 
+      icon, 
+      prefix, 
+      suffix, 
+      subtitle, 
+      size, 
+      dbPath, 
+      sql, 
+      color,
+      fontSize,
+      sectionStyle,
+      xAxisCol,
+      yAxisCols,
+      chartMode,
+      dualAxis
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Widget ID is required for editing.' }, { status: 400 });
@@ -148,7 +210,13 @@ export async function PUT(request) {
       size, 
       dbPath, 
       sql, 
-      color 
+      color,
+      fontSize,
+      sectionStyle,
+      xAxisCol,
+      yAxisCols,
+      chartMode,
+      dualAxis
     }, dashboardId);
 
     if (!res) {

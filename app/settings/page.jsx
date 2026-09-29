@@ -20,7 +20,7 @@ import {
   FolderDown,
   LayoutDashboard
 } from 'lucide-react';
-import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl } from '../lib/apiClient';
+import { apiFetch, isNativeMobile, getApiBaseUrl, setApiBaseUrl, exportAndSaveFile } from '../lib/apiClient';
 
 export default function SettingsPage() {
   const [activeDb, setActiveDb] = useState(null);
@@ -160,27 +160,20 @@ export default function SettingsPage() {
   };
 
   const handleExportFile = async (filename = 'userman_active.db') => {
+    setMessage(null);
+    setError(null);
     try {
       const res = await apiFetch(`/api/userman/export?filename=${encodeURIComponent(filename)}`);
       const data = await res.json();
       if (data.success && data.base64) {
-        const byteCharacters = atob(data.base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename || filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setMessage(`Exported ${filename} successfully!`);
-        setTimeout(() => setMessage(null), 3000);
+        const result = await exportAndSaveFile({
+          filename: data.filename || filename,
+          data: { base64: data.base64 },
+          mimeType: 'application/octet-stream',
+          title: `Database Export: ${filename}`
+        });
+        setMessage(result.message || `Exported ${filename} successfully!`);
+        setTimeout(() => setMessage(null), 5000);
       } else {
         setError(data.error || 'Failed to export database.');
       }
@@ -202,18 +195,18 @@ export default function SettingsPage() {
           dashboards: data.dashboards
         };
         const jsonStr = JSON.stringify(configToExport, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
         const dateStr = new Date().toISOString().slice(0, 10);
-        a.download = `configs_backup_${dateStr}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setMessage('Successfully exported configs.json backup file!');
-        setTimeout(() => setMessage(null), 4000);
+        const filename = `configs_backup_${dateStr}.json`;
+
+        const result = await exportAndSaveFile({
+          filename,
+          data: jsonStr,
+          mimeType: 'application/json',
+          title: 'Dashboard Configuration Backup'
+        });
+
+        setMessage(result.message || 'Successfully exported configs.json backup file!');
+        setTimeout(() => setMessage(null), 5000);
       } else {
         setError(data.error || 'Failed to read configuration data.');
       }

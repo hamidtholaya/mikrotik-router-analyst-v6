@@ -17,6 +17,8 @@ import {
   MoreVertical,
   ArrowRightLeft,
   Trash2,
+  Copy,
+  Bookmark,
   Users,
   Wifi,
   Download,
@@ -49,10 +51,17 @@ const ICON_MAP = {
   Layers,
   Zap,
   BarChart3,
-  Database
+  Database,
+  Bookmark
 };
 
 const COLOR_THEMES = {
+  // Eye-Comfort & Grayscale Monochrome
+  zinc: { text: 'var(--color-zinc-text)', bg: 'var(--color-zinc-bg)', border: 'var(--color-zinc-border)' },
+  graphite: { text: 'var(--color-graphite-text)', bg: 'var(--color-graphite-bg)', border: 'var(--color-graphite-border)' },
+  stone: { text: 'var(--color-stone-text)', bg: 'var(--color-stone-bg)', border: 'var(--color-stone-border)' },
+  steel: { text: 'var(--color-steel-text)', bg: 'var(--color-steel-bg)', border: 'var(--color-steel-border)' },
+
   // Calm & Muted Color Options
   slate: { text: 'var(--color-slate-text)', bg: 'var(--color-slate-bg)', border: 'var(--color-slate-border)' },
   sage: { text: 'var(--color-sage-text)', bg: 'var(--color-sage-bg)', border: 'var(--color-sage-border)' },
@@ -97,6 +106,13 @@ ChartJS.register(
   Legend
 );
 
+const FONT_SIZE_MAP = {
+  compact: '1.5rem',
+  standard: '2.2rem',
+  large: '2.75rem',
+  hero: '3.3rem'
+};
+
 export default function WidgetCard({ 
   item, 
   isFirst, 
@@ -105,17 +121,35 @@ export default function WidgetCard({
   onMoveRight, 
   onEditClick, 
   onDeleteClick,
+  onDuplicateClick,
   dashboards = [],
   onMoveClick
 }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(item.type !== 'section_divider');
   const [error, setError] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(false);
 
   useEffect(() => {
+    const updateTheme = () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      setIsLightMode(currentTheme === 'light');
+    };
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (item.type === 'section_divider') {
+      setLoading(false);
+      return;
+    }
     fetchQueryResult();
-  }, [item.sql, item.dbPath]);
+  }, [item.sql, item.dbPath, item.type]);
 
   const fetchQueryResult = async () => {
     setLoading(true);
@@ -182,11 +216,11 @@ export default function WidgetCard({
     }
 
     const colorPalettes = [
-      { bg: 'rgba(6, 182, 212, 0.75)', border: '#06b6d4' },
+      { bg: isLightMode ? 'rgba(2, 132, 199, 0.75)' : 'rgba(6, 182, 212, 0.75)', border: isLightMode ? '#0284c7' : '#06b6d4' },
       { bg: 'rgba(16, 185, 129, 0.75)', border: '#10b981' },
-      { bg: 'rgba(139, 92, 246, 0.75)', border: '#8b5cf6' },
+      { bg: isLightMode ? 'rgba(124, 58, 237, 0.75)' : 'rgba(139, 92, 246, 0.75)', border: isLightMode ? '#7c3aed' : '#8b5cf6' },
       { bg: 'rgba(245, 158, 11, 0.75)', border: '#f59e0b' },
-      { bg: 'rgba(244, 63, 94, 0.75)', border: '#f43f5e' },
+      { bg: isLightMode ? 'rgba(225, 29, 72, 0.75)' : 'rgba(244, 63, 94, 0.75)', border: isLightMode ? '#e11d48' : '#f43f5e' },
       { bg: 'rgba(59, 130, 246, 0.75)', border: '#3b82f6' }
     ];
 
@@ -214,7 +248,7 @@ export default function WidgetCard({
         pointHoverRadius: isLine ? 6 : 6, // Points pop up smoothly when finger touches/drags
         pointHitRadius: isLine ? 25 : 10, // Large touch area so it's super easy to tap on phones
         pointBackgroundColor: palette.border,
-        pointBorderColor: '#ffffff',
+        pointBorderColor: isLightMode ? '#ffffff' : '#0f172a',
         pointBorderWidth: 2
       };
 
@@ -242,17 +276,17 @@ export default function WidgetCard({
       legend: {
         position: 'top',
         labels: { 
-          color: 'var(--text-muted)', 
-          font: { family: 'Outfit', size: 11 },
+          color: isLightMode ? '#334155' : '#cbd5e1', 
+          font: { family: 'Outfit', size: 11, weight: '500' },
           boxWidth: 10,
           padding: 8
         }
       },
       tooltip: {
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
-        titleColor: '#f1f5f9',
-        bodyColor: '#cbd5e1',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.98)' : 'rgba(15, 23, 42, 0.95)',
+        titleColor: isLightMode ? '#0f172a' : '#f8fafc',
+        bodyColor: isLightMode ? '#334155' : '#cbd5e1',
+        borderColor: isLightMode ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)',
         borderWidth: 1,
         padding: 8,
         cornerRadius: 8,
@@ -263,13 +297,13 @@ export default function WidgetCard({
       x: { 
         stacked: isStacked,
         ticks: { 
-          color: 'var(--text-muted)',
+          color: isLightMode ? '#475569' : '#94a3b8',
           autoSkip: true,
           maxTicksLimit: 5,
           maxRotation: 0,
           font: { family: 'Outfit', size: 10 }
         }, 
-        grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false } 
+        grid: { color: isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)', drawBorder: false } 
       },
       y: { 
         type: 'linear',
@@ -277,11 +311,11 @@ export default function WidgetCard({
         position: 'left',
         stacked: isStacked,
         ticks: { 
-          color: 'var(--text-muted)',
+          color: isLightMode ? '#475569' : '#94a3b8',
           maxTicksLimit: 5,
           font: { family: 'Outfit', size: 10 }
         }, 
-        grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false } 
+        grid: { color: isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)', drawBorder: false } 
       },
       ...(hasDualAxis ? {
         y1: {
@@ -289,7 +323,7 @@ export default function WidgetCard({
           display: true,
           position: 'right',
           ticks: { 
-            color: 'var(--accent-purple)',
+            color: isLightMode ? '#7c3aed' : 'var(--accent-purple)',
             maxTicksLimit: 5,
             font: { family: 'Outfit', size: 10 }
           },
@@ -301,6 +335,278 @@ export default function WidgetCard({
 
   const CardIcon = (item.icon && ICON_MAP[item.icon]) ? ICON_MAP[item.icon] : Activity;
   const theme = COLOR_THEMES[item.color] || COLOR_THEMES.cyan;
+
+  const renderActionDropdown = (typeLabel = 'Widget') => (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setShowMenu(prev => !prev)}
+        style={{
+          background: showMenu ? 'var(--bg-secondary)' : 'rgba(125,125,125,0.08)',
+          border: '1px solid',
+          borderColor: showMenu ? 'var(--border-active)' : 'transparent',
+          color: showMenu ? 'var(--text-main)' : 'var(--text-dim)',
+          cursor: 'pointer',
+          padding: '5px 7px',
+          borderRadius: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.15s ease'
+        }}
+        title={`${typeLabel} actions`}
+      >
+        <MoreVertical style={{ width: '15px', height: '15px' }} />
+      </button>
+
+      {/* Dropdown Menu */}
+      {showMenu && (
+        <>
+          <div 
+            style={{ position: 'fixed', inset: 0, zIndex: 999 }} 
+            onClick={() => setShowMenu(false)} 
+          />
+          <div
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 'calc(100% + 6px)',
+              zIndex: 1000,
+              minWidth: '180px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(16px)',
+              padding: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}
+          >
+            {/* Edit Widget */}
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                if (onEditClick) onEditClick(item);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                width: '100%',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-main)',
+                fontSize: '0.84rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <Edit3 style={{ width: '14px', height: '14px', color: 'var(--accent-purple)' }} />
+              Edit {typeLabel}
+            </button>
+
+            {/* Duplicate Widget */}
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                if (onDuplicateClick) onDuplicateClick(item);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                width: '100%',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-main)',
+                fontSize: '0.84rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <Copy style={{ width: '14px', height: '14px', color: 'var(--accent-emerald)' }} />
+              Duplicate {typeLabel}
+            </button>
+
+            {/* Move to Dashboard (Only if more than 1 dashboard) */}
+            {dashboards && dashboards.length > 1 && (
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  if (onMoveClick) onMoveClick(item);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 10px',
+                  width: '100%',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-main)',
+                  fontSize: '0.84rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+              >
+                <ArrowRightLeft style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)' }} />
+                Move to Dashboard
+              </button>
+            )}
+
+            <div style={{ height: '1px', background: 'var(--border-color)', margin: '2px 0' }} />
+
+            {/* Delete Widget */}
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                if (onDeleteClick) onDeleteClick(item);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                width: '100%',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--accent-rose)',
+                fontSize: '0.84rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <Trash2 style={{ width: '14px', height: '14px' }} />
+              Delete {typeLabel}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // SECTION DIVIDER VIEW
+  if (item.type === 'section_divider') {
+    const sectionStyle = item.sectionStyle || 'line';
+
+    return (
+      <div 
+        style={{
+          gridColumn: 'span 12',
+          margin: '14px 0 6px 0',
+          position: 'relative',
+          width: '100%'
+        }}
+      >
+        {sectionStyle === 'banner' && (
+          <div 
+            className="glass-panel" 
+            style={{
+              padding: '14px 18px',
+              borderRadius: 'var(--radius-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: theme.bg,
+              border: `1px solid ${theme.border}`,
+              gap: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: `1px solid ${theme.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: theme.text,
+                flexShrink: 0
+              }}>
+                <CardIcon style={{ width: '18px', height: '18px' }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ fontSize: '1.08rem', fontWeight: '800', color: theme.text, letterSpacing: '-0.02em', margin: 0 }}>
+                  {item.name}
+                </h3>
+                {item.subtitle && (
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    {item.subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+            {renderActionDropdown('Section')}
+          </div>
+        )}
+
+        {sectionStyle === 'minimal' && (
+          <div 
+            style={{
+              padding: '8px 14px',
+              borderLeft: `4px solid ${theme.text}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              background: 'transparent'
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CardIcon style={{ width: '18px', height: '18px', color: theme.text }} />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0 }}>
+                  {item.name}
+                </h3>
+              </div>
+              {item.subtitle && (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                  {item.subtitle}
+                </p>
+              )}
+            </div>
+            {renderActionDropdown('Section')}
+          </div>
+        )}
+
+        {(sectionStyle === 'line' || (sectionStyle !== 'banner' && sectionStyle !== 'minimal')) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '24px',
+              background: theme.bg,
+              border: `1px solid ${theme.border}`,
+              flexShrink: 0
+            }}>
+              <CardIcon style={{ width: '16px', height: '16px', color: theme.text }} />
+              <span style={{ fontWeight: '700', fontSize: '0.94rem', color: theme.text }}>
+                {item.name}
+              </span>
+              {item.subtitle && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: '400' }}>
+                  • {item.subtitle}
+                </span>
+              )}
+            </div>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)', opacity: 0.8 }} />
+            {renderActionDropdown('Section')}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -356,135 +662,7 @@ export default function WidgetCard({
             <RefreshCw style={{ width: '14px', height: '14px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
 
-          {/* Action Button (More Options Dropdown) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowMenu(prev => !prev)}
-              style={{
-                background: showMenu ? 'var(--bg-secondary)' : 'rgba(125,125,125,0.08)',
-                border: '1px solid',
-                borderColor: showMenu ? 'var(--border-active)' : 'transparent',
-                color: showMenu ? 'var(--text-main)' : 'var(--text-dim)',
-                cursor: 'pointer',
-                padding: '5px 7px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-              title="Widget actions"
-            >
-              <MoreVertical style={{ width: '15px', height: '15px' }} />
-            </button>
-
-            {/* Dropdown Menu */}
-            {showMenu && (
-              <>
-                <div 
-                  style={{ position: 'fixed', inset: 0, zIndex: 999 }} 
-                  onClick={() => setShowMenu(false)} 
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 'calc(100% + 6px)',
-                    zIndex: 1000,
-                    minWidth: '175px',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4)',
-                    backdropFilter: 'blur(16px)',
-                    padding: '6px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                >
-                  {/* Edit Widget */}
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      if (onEditClick) onEditClick(item);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 10px',
-                      width: '100%',
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--text-main)',
-                      fontSize: '0.84rem',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <Edit3 style={{ width: '14px', height: '14px', color: 'var(--accent-purple)' }} />
-                    Edit Widget
-                  </button>
-
-                  {/* Move to Dashboard (Only if more than 1 dashboard) */}
-                  {dashboards && dashboards.length > 1 && (
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        if (onMoveClick) onMoveClick(item);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '8px 10px',
-                        width: '100%',
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--text-main)',
-                        fontSize: '0.84rem',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <ArrowRightLeft style={{ width: '14px', height: '14px', color: 'var(--accent-cyan)' }} />
-                      Move to Dashboard
-                    </button>
-                  )}
-
-                  <div style={{ height: '1px', background: 'var(--border-color)', margin: '2px 0' }} />
-
-                  {/* Delete Widget */}
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      if (onDeleteClick) onDeleteClick(item);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 10px',
-                      width: '100%',
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--accent-rose)',
-                      fontSize: '0.84rem',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <Trash2 style={{ width: '14px', height: '14px' }} />
-                    Delete Widget
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {renderActionDropdown('Widget')}
         </div>
       </div>
 
@@ -560,7 +738,7 @@ export default function WidgetCard({
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
                 <div style={{
-                  fontSize: '2.2rem',
+                  fontSize: FONT_SIZE_MAP[item.fontSize] || '2.2rem',
                   fontWeight: '800',
                   color: theme.text,
                   letterSpacing: '-0.03em',

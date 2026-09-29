@@ -352,6 +352,26 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDuplicateWidget = async (targetItem) => {
+    try {
+      const res = await apiFetch('/api/dashboard/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'duplicate_widget',
+          itemId: targetItem.id,
+          dashboardId: activeDashboard.id
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.dashboards) {
+        setDashboards(data.dashboards);
+      }
+    } catch (err) {
+      console.error('Error duplicating widget:', err);
+    }
+  };
+
   const syncTime = formatRelativeTime(activeDb?.lastModified);
 
   return (
@@ -582,6 +602,7 @@ export default function DashboardPage() {
               onMoveRight={handleMoveRight}
               onEditClick={(targetItem) => handleOpenEditModal(targetItem)}
               onDeleteClick={(targetItem) => setDeletingItem(targetItem)}
+              onDuplicateClick={(targetItem) => handleDuplicateWidget(targetItem)}
               dashboards={dashboards}
               currentDashboardId={activeDashboard.id}
               onMoveClick={(targetItem) => setMovingWidget(targetItem)}

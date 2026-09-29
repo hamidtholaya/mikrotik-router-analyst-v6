@@ -30,11 +30,13 @@ import {
   Radio,
   Loader2
 } from 'lucide-react';
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch, exportAndSaveFile } from '../lib/apiClient';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exportMsg, setExportMsg] = useState(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -90,6 +92,7 @@ export default function UsersPage() {
 
   const fetchUsers = async (targetPage = pagination.page) => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({
         page: targetPage.toString(),
@@ -109,9 +112,12 @@ export default function UsersPage() {
         if (result.pagination) setPagination(result.pagination);
         if (result.stats) setStats(result.stats);
         if (result.profiles) setProfiles(result.profiles);
+      } else {
+        setError(result.error || 'Failed to load users from database.');
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
+      setError(err.message || 'Error connecting to database.');
     } finally {
       setLoading(false);
     }
@@ -173,7 +179,7 @@ export default function UsersPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const exportToCsv = () => {
+  const exportToCsv = async () => {
     if (!users || users.length === 0) return;
     
     const headers = ['ID', 'Username', 'Password', 'Profile', 'Status', 'Download Used', 'Upload Used', 'Uptime'];
@@ -182,20 +188,26 @@ export default function UsersPage() {
       `"${u.userName || ''}"`,
       `"${u.password || ''}"`,
       `"${u.actualProfileName || 'None'}"`,
-      u.statusLabel,
-      `"${u.downloadFormatted}"`,
-      `"${u.uploadFormatted}"`,
-      `"${u.uptimeFormatted}"`
+      u.statusLabel || (u.disabled ? 'Disabled' : 'Active'),
+      `"${u.downloadFormatted || ''}"`,
+      `"${u.uploadFormatted || ''}"`,
+      `"${u.uptimeFormatted || ''}"`
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `userman_users_export_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const filename = `userman_users_export_${Date.now()}.csv`;
+
+    const res = await exportAndSaveFile({
+      filename,
+      data: csvContent,
+      mimeType: 'text/csv',
+      title: 'User Manager Export'
+    });
+
+    if (res && res.message) {
+      setExportMsg(res.message);
+      setTimeout(() => setExportMsg(null), 5000);
+    }
   };
 
   return (
@@ -253,6 +265,52 @@ export default function UsersPage() {
         </button>
       </div>
 
+      {/* Export Notification */}
+      {exportMsg && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.1)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 16px',
+          color: 'var(--accent-emerald)',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <Check style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+          <div>{exportMsg}</div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.1)',
+          border: '1px solid rgba(244, 63, 94, 0.3)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 16px',
+          color: 'var(--accent-rose)',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldAlert style={{ width: '18px', height: '18px', flexShrink: 0 }} />
+            <div>{error}</div>
+          </div>
+          <button 
+            onClick={() => fetchUsers(1)} 
+            className="btn btn-secondary" 
+            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Summary Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         
@@ -262,7 +320,7 @@ export default function UsersPage() {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Total Accounts</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>{stats.totalUsers.toLocaleString()}</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>{(stats?.totalUsers || 0).toLocaleString()}</div>
           </div>
         </div>
 
@@ -272,7 +330,7 @@ export default function UsersPage() {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Active Users</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--accent-emerald)' }}>{stats.activeUsers.toLocaleString()}</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--accent-emerald)' }}>{(stats?.activeUsers || 0).toLocaleString()}</div>
           </div>
         </div>
 
@@ -282,7 +340,7 @@ export default function UsersPage() {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Disabled Users</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--accent-rose)' }}>{stats.disabledUsers.toLocaleString()}</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--accent-rose)' }}>{(stats?.disabledUsers || 0).toLocaleString()}</div>
           </div>
         </div>
 
@@ -292,7 +350,7 @@ export default function UsersPage() {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Total Traffic Used</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>{stats.totalTrafficFormatted}</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>{stats?.totalTrafficFormatted || '0 B'}</div>
           </div>
         </div>
 

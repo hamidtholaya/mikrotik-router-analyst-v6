@@ -1,8 +1,16 @@
 package com.routeranalyst.mikrotik;
 
+import android.content.ContentValues;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
+
+import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -680,5 +688,91 @@ public class MikroTikNativePlugin extends Plugin {
                 if (db != null) db.close();
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void saveAndShareFile(PluginCall call) {
+        String filename = call.getString("filename", "export_" + System.currentTimeMillis() + ".bin");
+        String base64 = call.getString("base64", "");
+        String mimeType = call.getString("mimeType", "application/octet-stream");
+        String title = call.getString("title", "Exported File");
+
+        if (base64 == null || base64.isEmpty()) {
+            call.reject("base64 data is required.");
+            return;
+        }
+
+        try {
+            byte[] data = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+
+            // 1. Write to app's cache directory first for reliable FileProvider sharing
+            File cacheFile = new File(getContext().getCacheDir(), filename);
+            try (FileOutputStream fos = new FileOutputStream(cacheFile)) {
+                fos.write(data);
+                fos.flush();
+            }
+
+            // 2. Save directly into device's public Downloads directory
+            boolean savedToDownloads = false;
+            String publicLocation = "";
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+                Uri uri = getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    try (OutputStream os = getContext().getContentResolver().openOutputStream(uri)) {
+                        if (os != null) {
+                            os.write(data);
+                            os.flush();
+                            savedToDownloads = true;
+                            publicLocation = "Downloads/" + filename;
+                        }
+                    }
+                }
+            } else {
+                File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!downloadsDir.exists()) downloadsDir.mkdirs();
+                File target = new File(downloadsDir, filename);
+                try (FileOutputStream fos = new FileOutputStream(target)) {
+                    fos.write(data);
+                    fos.flush();
+                    savedToDownloads = true;
+                    publicLocation = target.getAbsolutePath();
+                }
+            }
+
+            // 3. Open Android system Share Sheet with FileProvider
+            Uri shareUri = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                cacheFile
+            );
+
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType(mimeType);
+            shareIntent.putExtra(Intent.EXTRA_STREAM, shareUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, title);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            Intent chooser = Intent.createChooser(shareIntent, title);
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            ret.put("filename", filename);
+            ret.put("savedToDownloads", savedToDownloads);
+            ret.put("location", publicLocation.isEmpty() ? "Downloads/" + filename : publicLocation);
+            ret.put("message", "File saved to " + (publicLocation.isEmpty() ? "Downloads" : publicLocation) + " and opened in Share menu.");
+            call.resolve(ret);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Save and share error: ", e);
+            call.reject("Failed to save and share file: " + e.getMessage());
+        }
     }
 }

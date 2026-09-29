@@ -414,6 +414,36 @@ async function handleNativeRequest(endpoint, options) {
         return new Response(JSON.stringify({ success: false, error: 'Widget or dashboard not found' }), { status: 400 });
       }
 
+      // 3bb. Duplicate Widget
+      if (body.action === 'duplicate_widget') {
+        const { itemId, dashboardId } = body;
+        const targetId = dashboardId || configData.activeDashboardId;
+        const dash = configData.dashboards.find(d => d.id === targetId) || configData.dashboards[0];
+
+        if (dash) {
+          const itemIdx = dash.items.findIndex(item => item.id === itemId);
+          if (itemIdx !== -1) {
+            const original = dash.items[itemIdx];
+            const duplicated = {
+              ...original,
+              id: `dash_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+              name: `${original.name} (Copy)`,
+              createdAt: new Date().toISOString()
+            };
+            dash.items.splice(itemIdx + 1, 0, duplicated);
+            saveDashboardsConfig(configData);
+            return new Response(JSON.stringify({
+              success: true,
+              message: `Duplicated widget "${duplicated.name}".`,
+              item: duplicated,
+              dashboards: configData.dashboards,
+              activeDashboardId: configData.activeDashboardId
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+        }
+        return new Response(JSON.stringify({ success: false, error: 'Widget not found' }), { status: 400 });
+      }
+
       // 3c. Import Full configs.json
       if (body.action === 'import_config') {
         if (body.configData) {
@@ -452,10 +482,12 @@ async function handleNativeRequest(endpoint, options) {
         yAxisCols: Array.isArray(body.yAxisCols) ? body.yAxisCols : [],
         dualAxis: !!body.dualAxis,
         chartMode: body.chartMode || 'grouped',
-        size: body.size || 'full',
+        size: body.size || (body.type === 'section_divider' ? 'full' : 'half'),
         dbPath: body.dbPath || 'data/userman_active.db',
-        sql: body.sql || '',
+        sql: body.type === 'section_divider' ? '' : (body.sql || ''),
         color: body.color || 'cyan',
+        fontSize: body.fontSize || 'standard',
+        sectionStyle: body.sectionStyle || 'line',
         createdAt: new Date().toISOString()
       };
 
@@ -578,10 +610,20 @@ async function handleNativeRequest(endpoint, options) {
 
     const whereClauses = [];
     if (search) {
-      whereClauses.push(`(CAST(userName AS TEXT) LIKE '%${search}%' OR CAST(comment AS TEXT) LIKE '%${search}%')`);
+      const escaped = search.replace(/'/g, "''");
+      whereClauses.push(`(
+        CAST(userName AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(firstName AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(lastName AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(phone AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(email AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(descr AS TEXT) LIKE '%${escaped}%' OR 
+        CAST(actualProfileName AS TEXT) LIKE '%${escaped}%'
+      )`);
     }
     if (profile && profile !== 'all') {
-      whereClauses.push(`CAST(actualProfileName AS TEXT) = '${profile}'`);
+      const escapedProfile = profile.replace(/'/g, "''");
+      whereClauses.push(`CAST(actualProfileName AS TEXT) = '${escapedProfile}'`);
     }
     if (status === 'active') {
       whereClauses.push(`disabled = 0`);
@@ -594,22 +636,32 @@ async function handleNativeRequest(endpoint, options) {
 
     const dataSql = `
       SELECT id, 
+             custId,
              CAST(userName AS TEXT) AS userName, 
-             password, 
-             CAST(actualProfileName AS TEXT) AS actualProfileName, 
+             CAST(password AS TEXT) AS password, 
              disabled, 
-             uptimeUsed, 
+             CAST(firstName AS TEXT) AS firstName,
+             CAST(lastName AS TEXT) AS lastName,
+             CAST(phone AS TEXT) AS phone,
+             CAST(email AS TEXT) AS email,
+             CAST(descr AS TEXT) AS descr,
              downloadUsed, 
              uploadUsed, 
+             uptimeUsed, 
+             CAST(actualProfileName AS TEXT) AS actualProfileName, 
+             profileTillTime,
+             profileTimeLeft,
+             lastSeenAt,
+             CAST(lastIp AS TEXT) AS lastIp,
              CAST(comment AS TEXT) AS comment 
-      FROM usermgr_users 
+      FROM user 
       ${whereStr} 
       ORDER BY ${safeSortCol} ${sortDir} 
       LIMIT ${limit} OFFSET ${offset};
     `;
 
-    const countSql = `SELECT COUNT(*) AS total FROM usermgr_users ${whereStr};`;
-    const profilesSql = `SELECT DISTINCT CAST(actualProfileName AS TEXT) AS profileName FROM usermgr_users WHERE actualProfileName IS NOT NULL;`;
+    const countSql = `SELECT COUNT(*) AS total FROM user ${whereStr};`;
+    const profilesSql = `SELECT DISTINCT CAST(actualProfileName AS TEXT) AS profileName FROM user WHERE actualProfileName IS NOT NULL;`;
     const statsSql = `
       SELECT 
         COUNT(*) AS totalUsers,
@@ -618,7 +670,7 @@ async function handleNativeRequest(endpoint, options) {
         SUM(downloadUsed) AS totalDownload,
         SUM(uploadUsed) AS totalUpload,
         SUM(uptimeUsed) AS totalUptime
-      FROM usermgr_users;
+      FROM user;
     `;
 
     try {
@@ -637,7 +689,8 @@ async function handleNativeRequest(endpoint, options) {
         downloadFormatted: formatBytes(u.downloadUsed),
         uploadFormatted: formatBytes(u.uploadUsed),
         totalFormatted: formatBytes((u.downloadUsed || 0) + (u.uploadUsed || 0)),
-        uptimeFormatted: formatUptime(u.uptimeUsed)
+        uptimeFormatted: formatUptime(u.uptimeUsed),
+        statusLabel: u.disabled === 1 ? 'Disabled' : 'Active'
       }));
 
       const statRow = statsRes.rows && statsRes.rows[0] ? statsRes.rows[0] : {};
@@ -685,14 +738,22 @@ async function handleNativeRequest(endpoint, options) {
     const offset = (page - 1) * limit;
 
     const dataSql = `
-      SELECT id, userId, CAST(userIp AS TEXT) AS userIp, CAST(callingStationId AS TEXT) AS callingStationId,
-             uptime, download, upload, active, startTime, stopTime, CAST(terminateCause AS TEXT) AS terminateCause
-      FROM usermgr_sessions
+      SELECT id, 
+             userId, 
+             active, 
+             fromTime, 
+             tillTime, 
+             upTime, 
+             bytesDownload, 
+             bytesUpload, 
+             CAST(callingStationId AS TEXT) AS mac, 
+             ipUser 
+      FROM session
       ${whereStr}
-      ORDER BY id DESC
+      ORDER BY fromTime DESC, id DESC
       LIMIT ${limit} OFFSET ${offset};
     `;
-    const countSql = `SELECT COUNT(*) AS total FROM usermgr_sessions ${whereStr};`;
+    const countSql = `SELECT COUNT(*) AS total FROM session ${whereStr};`;
 
     try {
       const [dataRes, countRes] = await Promise.all([
@@ -703,10 +764,10 @@ async function handleNativeRequest(endpoint, options) {
       const total = countRes.rows && countRes.rows[0] ? countRes.rows[0].total : 0;
       const rawSessions = (dataRes.rows || []).map(s => ({
         ...s,
-        downloadFormatted: formatBytes(s.download),
-        uploadFormatted: formatBytes(s.upload),
-        totalFormatted: formatBytes((s.download || 0) + (s.upload || 0)),
-        uptimeFormatted: formatUptime(s.uptime)
+        downloadFormatted: formatBytes(s.bytesDownload),
+        uploadFormatted: formatBytes(s.bytesUpload),
+        totalFormatted: formatBytes((s.bytesDownload || 0) + (s.bytesUpload || 0)),
+        uptimeFormatted: formatUptime(s.upTime)
       }));
 
       return new Response(JSON.stringify({
@@ -727,6 +788,80 @@ async function handleNativeRequest(endpoint, options) {
 
   // Fallback for any unknown route
   return new Response(JSON.stringify({ success: false, error: 'Endpoint not implemented in native mode' }), { status: 404 });
+}
+
+/**
+ * Universal file saver & sharer:
+ * - On Native Android: writes to public Downloads folder & invokes native Android Share Sheet!
+ * - On PC / Web: triggers regular browser download.
+ */
+export async function exportAndSaveFile({ filename, data, mimeType = 'application/octet-stream', title = 'Exported File' }) {
+  if (isNativeMobile()) {
+    try {
+      let base64Str = '';
+      if (typeof data === 'string') {
+        // UTF-8 string to base64
+        base64Str = btoa(unescape(encodeURIComponent(data)));
+      } else if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(data);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        base64Str = btoa(binary);
+      } else if (data && data.base64) {
+        base64Str = data.base64;
+      }
+
+      const res = await MikroTikNative.saveAndShareFile({
+        filename,
+        base64: base64Str,
+        mimeType,
+        title
+      });
+
+      return {
+        success: true,
+        message: res.message || `File saved to ${res.location || 'Downloads'} and opened in Share menu!`,
+        location: res.location || 'Downloads/' + filename
+      };
+    } catch (nativeErr) {
+      console.error('[MikroTikNative] Error in saveAndShareFile:', nativeErr);
+      // Fallback to web download if native share fails
+    }
+  }
+
+  // Web Browser fallback
+  let blob;
+  if (data instanceof Blob) {
+    blob = data;
+  } else if (typeof data === 'string') {
+    blob = new Blob([data], { type: mimeType });
+  } else if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+    blob = new Blob([data], { type: mimeType });
+  } else if (data && data.base64) {
+    const byteCharacters = atob(data.base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    blob = new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  return {
+    success: true,
+    message: `Exported ${filename} successfully!`,
+    location: 'Downloads'
+  };
 }
 
 /**

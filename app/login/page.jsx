@@ -126,7 +126,7 @@ export default function LoginPage() {
     setConnecting(true);
     setErrorMsg(null);
 
-    // Immediate Demo Mode bypass
+    // Demo Mode bypass (ensuring session cookie is also set in web mode)
     if (formData.demo) {
       localStorage.setItem('mikrotik_session', JSON.stringify({
         user: 'demo-admin',
@@ -134,6 +134,19 @@ export default function LoginPage() {
         isDemo: true,
         timestamp: Date.now()
       }));
+
+      if (!isNativeMobile()) {
+        try {
+          await apiFetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ demo: true })
+          });
+        } catch (e) {
+          // ignore network issue if standalone
+        }
+      }
+
       router.push('/dashboard');
       router.refresh();
       return;
