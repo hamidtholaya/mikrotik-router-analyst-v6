@@ -58,6 +58,38 @@ function formatUptime(seconds) {
   return parts.join(' ') || '0s';
 }
 
+function formatTimestamp(timestamp) {
+  if (!timestamp || isNaN(timestamp) || timestamp <= 0) return 'N/A';
+  try {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
+  } catch (err) {
+    return 'N/A';
+  }
+}
+
+function decodeIpAddress(val) {
+  if (!val) return 'N/A';
+  if (typeof val === 'string') {
+    if (val.includes('.')) return val;
+    if (val.length === 4) {
+      return `${val.charCodeAt(0)}.${val.charCodeAt(1)}.${val.charCodeAt(2)}.${val.charCodeAt(3)}`;
+    }
+    return val;
+  }
+  if (Array.isArray(val) && val.length >= 4) {
+    return `${val[0]}.${val[1]}.${val[2]}.${val[3]}`;
+  }
+  if (typeof val === 'number') {
+    const b0 = (val >>> 24) & 255;
+    const b1 = (val >>> 16) & 255;
+    const b2 = (val >>> 8) & 255;
+    const b3 = val & 255;
+    return `${b0}.${b1}.${b2}.${b3}`;
+  }
+  return 'N/A';
+}
+
 function getStoredCreds() {
   try {
     const active = localStorage.getItem('mikrotik_creds_active');
@@ -651,9 +683,9 @@ async function handleNativeRequest(endpoint, options) {
              CAST(actualProfileName AS TEXT) AS actualProfileName, 
              profileTillTime,
              profileTimeLeft,
-             lastSeenAt,
-             CAST(lastIp AS TEXT) AS lastIp,
-             CAST(comment AS TEXT) AS comment 
+              lastSeenAt,
+              CAST(lastIp AS TEXT) AS lastIp,
+              CAST(lastMAC AS TEXT) AS lastMAC 
       FROM user 
       ${whereStr} 
       ORDER BY ${safeSortCol} ${sortDir} 
@@ -681,7 +713,24 @@ async function handleNativeRequest(endpoint, options) {
         MikroTikNative.executeQuery({ sql: statsSql, dbName: 'userman_active.db' })
       ]);
 
-      const total = countRes.rows && countRes.rows[0] ? countRes.rows[0].total : 0;
+      if (dataRes && dataRes.success === false) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: dataRes.error || 'Database file userman_active.db does not exist. Tap "Reload & Replace Active sqldb" in Settings first.' 
+        }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (countRes && countRes.success === false) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: countRes.error || 'Failed to query user database.' 
+        }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const total = countRes.rows && countRes.rows[0] ? (countRes.rows[0].total || 0) : 0;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const currentPage = Math.max(1, Math.min(page, totalPages));
+
       const rawUsers = dataRes.rows || [];
       const formattedUsers = rawUsers.map(u => ({
         ...u,
@@ -689,8 +738,10 @@ async function handleNativeRequest(endpoint, options) {
         downloadFormatted: formatBytes(u.downloadUsed),
         uploadFormatted: formatBytes(u.uploadUsed),
         totalFormatted: formatBytes((u.downloadUsed || 0) + (u.uploadUsed || 0)),
+        totalUsedFormatted: formatBytes((u.downloadUsed || 0) + (u.uploadUsed || 0)),
         uptimeFormatted: formatUptime(u.uptimeUsed),
-        statusLabel: u.disabled === 1 ? 'Disabled' : 'Active'
+        statusLabel: u.disabled === 1 ? 'Disabled' : 'Active',
+        statusColor: u.disabled === 1 ? 'rose' : 'emerald'
       }));
 
       const statRow = statsRes.rows && statsRes.rows[0] ? statsRes.rows[0] : {};
@@ -700,10 +751,13 @@ async function handleNativeRequest(endpoint, options) {
         success: true,
         data: formattedUsers,
         pagination: {
-          page,
+          page: currentPage,
           limit,
           total,
-          totalPages: Math.ceil(total / limit)
+          totalRecords: total,
+          totalPages,
+          hasPrev: currentPage > 1,
+          hasNext: currentPage < totalPages
         },
         stats: {
           totalUsers: statRow.totalUsers || 0,
@@ -718,7 +772,7 @@ async function handleNativeRequest(endpoint, options) {
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
     } catch (err) {
-      return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500 });
+      return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
   }
 
@@ -726,8 +780,8 @@ async function handleNativeRequest(endpoint, options) {
   if (path === '/api/userman/sessions') {
     const userId = params.get('userId');
     const page = parseInt(params.get('page'), 10) || 1;
-    const limit = parseInt(params.get('limit'), 10) || 20;
-    const status = params.get('status') || 'all';
+    const limit = parseInt(params.get('limit'), 10) || 10;
+    const status = (params.get('status') || '').trim();
 
     const whereClauses = [];
     if (userId) whereClauses.push(`userId = ${parseInt(userId, 10)}`);
@@ -761,28 +815,54 @@ async function handleNativeRequest(endpoint, options) {
         MikroTikNative.executeQuery({ sql: countSql, dbName: 'userman_active.db' })
       ]);
 
-      const total = countRes.rows && countRes.rows[0] ? countRes.rows[0].total : 0;
+      if (dataRes && dataRes.success === false) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: dataRes.error || 'Failed to query user sessions.' 
+        }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (countRes && countRes.success === false) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: countRes.error || 'Failed to count user sessions.' 
+        }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const total = countRes.rows && countRes.rows[0] ? (countRes.rows[0].total || 0) : 0;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const currentPage = Math.max(1, Math.min(page, totalPages));
+
       const rawSessions = (dataRes.rows || []).map(s => ({
-        ...s,
+        id: s.id,
+        userId: s.userId,
+        active: s.active === 1,
+        ipAddress: decodeIpAddress(s.ipUser),
+        macAddress: s.mac || 'N/A',
+        startTimeFormatted: formatTimestamp(s.fromTime),
+        endTimeFormatted: s.active === 1 ? 'Active Session' : formatTimestamp(s.tillTime),
+        durationFormatted: formatUptime(s.upTime),
         downloadFormatted: formatBytes(s.bytesDownload),
         uploadFormatted: formatBytes(s.bytesUpload),
-        totalFormatted: formatBytes((s.bytesDownload || 0) + (s.bytesUpload || 0)),
-        uptimeFormatted: formatUptime(s.upTime)
+        totalTrafficFormatted: formatBytes((s.bytesDownload || 0) + (s.bytesUpload || 0))
       }));
 
       return new Response(JSON.stringify({
         success: true,
         data: rawSessions,
         pagination: {
-          page,
+          page: currentPage,
           limit,
           total,
-          totalPages: Math.ceil(total / limit)
+          totalRecords: total,
+          totalPages,
+          hasPrev: currentPage > 1,
+          hasNext: currentPage < totalPages
         }
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
     } catch (err) {
-      return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500 });
+      return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
   }
 

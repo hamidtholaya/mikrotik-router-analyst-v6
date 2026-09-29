@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Edit3,
@@ -129,7 +129,20 @@ export default function WidgetCard({
   const [loading, setLoading] = useState(item.type !== 'section_divider');
   const [error, setError] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const [isLightMode, setIsLightMode] = useState(false);
+  const menuButtonRef = useRef(null);
+
+  const handleToggleMenu = (e) => {
+    e.stopPropagation();
+    if (!showMenu && menuButtonRef.current) {
+      const rect = menuButtonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // If less than 240px below and enough space above, open upwards
+      setOpenUpwards(spaceBelow < 240 && rect.top > 200);
+    }
+    setShowMenu(prev => !prev);
+  };
 
   useEffect(() => {
     const updateTheme = () => {
@@ -337,9 +350,10 @@ export default function WidgetCard({
   const theme = COLOR_THEMES[item.color] || COLOR_THEMES.cyan;
 
   const renderActionDropdown = (typeLabel = 'Widget') => (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', zIndex: showMenu ? 110 : 'auto' }}>
       <button
-        onClick={() => setShowMenu(prev => !prev)}
+        ref={menuButtonRef}
+        onClick={handleToggleMenu}
         style={{
           background: showMenu ? 'var(--bg-secondary)' : 'rgba(125,125,125,0.08)',
           border: '1px solid',
@@ -369,18 +383,22 @@ export default function WidgetCard({
             style={{
               position: 'absolute',
               right: 0,
-              top: 'calc(100% + 6px)',
+              ...(openUpwards ? { bottom: 'calc(100% + 6px)' } : { top: 'calc(100% + 6px)' }),
               zIndex: 1000,
-              minWidth: '180px',
+              minWidth: '190px',
+              maxWidth: '90vw',
               background: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
+              border: '1px solid var(--border-active)',
               borderRadius: 'var(--radius-md)',
-              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4)',
-              backdropFilter: 'blur(16px)',
+              boxShadow: '0 16px 45px rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               padding: '6px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px'
+              gap: '4px',
+              maxHeight: 'min(320px, 80vh)',
+              overflowY: 'auto'
             }}
           >
             {/* Edit Widget */}
@@ -475,15 +493,16 @@ export default function WidgetCard({
                 padding: '8px 10px',
                 width: '100%',
                 border: 'none',
-                background: 'transparent',
+                background: 'rgba(244, 63, 94, 0.08)',
                 color: 'var(--accent-rose)',
                 fontSize: '0.84rem',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                textAlign: 'left'
+                textAlign: 'left',
+                fontWeight: '600'
               }}
             >
-              <Trash2 style={{ width: '14px', height: '14px' }} />
+              <Trash2 style={{ width: '14px', height: '14px', color: 'var(--accent-rose)' }} />
               Delete {typeLabel}
             </button>
           </div>
@@ -502,7 +521,8 @@ export default function WidgetCard({
           gridColumn: 'span 12',
           margin: '14px 0 6px 0',
           position: 'relative',
-          width: '100%'
+          width: '100%',
+          zIndex: showMenu ? 100 : 1
         }}
       >
         {sectionStyle === 'banner' && (
@@ -620,7 +640,8 @@ export default function WidgetCard({
         gap: '12px',
         position: 'relative',
         minWidth: 0,
-        maxWidth: '100%'
+        maxWidth: '100%',
+        zIndex: showMenu ? 100 : 1
       }}
     >
       

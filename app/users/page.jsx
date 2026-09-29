@@ -107,17 +107,32 @@ export default function UsersPage() {
       const res = await apiFetch(`/api/userman/users?${params.toString()}`);
       const result = await res.json();
 
-      if (result.success) {
+      if (result && result.success) {
         setUsers(result.data || []);
-        if (result.pagination) setPagination(result.pagination);
+        if (result.pagination) {
+          const p = result.pagination;
+          const totalRecs = p.totalRecords ?? p.total ?? 0;
+          const lim = p.limit || 25;
+          const pg = p.page || 1;
+          const tPages = p.totalPages || Math.max(1, Math.ceil(totalRecs / lim));
+          setPagination({
+            page: pg,
+            limit: lim,
+            totalRecords: totalRecs,
+            total: totalRecs,
+            totalPages: tPages,
+            hasPrev: typeof p.hasPrev === 'boolean' ? p.hasPrev : pg > 1,
+            hasNext: typeof p.hasNext === 'boolean' ? p.hasNext : pg < tPages
+          });
+        }
         if (result.stats) setStats(result.stats);
-        if (result.profiles) setProfiles(result.profiles);
+        if (result.profiles) setProfiles(result.profiles || []);
       } else {
-        setError(result.error || 'Failed to load users from database.');
+        setError(result?.error || 'Failed to load users from database.');
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
-      setError(err.message || 'Error connecting to database.');
+      setError(err?.message || 'Error connecting to database.');
     } finally {
       setLoading(false);
     }
@@ -129,16 +144,31 @@ export default function UsersPage() {
       const params = new URLSearchParams({
         userId: userId.toString(),
         page: targetPage.toString(),
-        limit: sessionsPagination.limit.toString(),
+        limit: (sessionsPagination?.limit || 10).toString(),
         status
       });
 
       const res = await apiFetch(`/api/userman/sessions?${params.toString()}`);
       const result = await res.json();
 
-      if (result.success) {
+      if (result && result.success) {
         setSessions(result.data || []);
-        if (result.pagination) setSessionsPagination(result.pagination);
+        if (result.pagination) {
+          const p = result.pagination;
+          const totalRecs = p.totalRecords ?? p.total ?? 0;
+          const lim = p.limit || 10;
+          const pg = p.page || 1;
+          const tPages = p.totalPages || Math.max(1, Math.ceil(totalRecs / lim));
+          setSessionsPagination({
+            page: pg,
+            limit: lim,
+            totalRecords: totalRecs,
+            total: totalRecs,
+            totalPages: tPages,
+            hasPrev: typeof p.hasPrev === 'boolean' ? p.hasPrev : pg > 1,
+            hasNext: typeof p.hasNext === 'boolean' ? p.hasNext : pg < tPages
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
@@ -221,7 +251,7 @@ export default function UsersPage() {
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button 
-              onClick={() => setSubTab('all')}
+              onClick={() => { setSubTab('all'); setSelectedStatus('all'); }}
               className="btn btn-secondary" 
               style={{ 
                 padding: '6px 14px', 
@@ -230,10 +260,10 @@ export default function UsersPage() {
                 color: subTab === 'all' ? 'var(--accent-cyan)' : 'var(--text-muted)' 
               }}
             >
-              All Users ({stats.totalUsers})
+              All Users ({stats?.totalUsers || 0})
             </button>
             <button 
-              onClick={() => setSubTab('active')}
+              onClick={() => { setSubTab('active'); setSelectedStatus('active'); }}
               className="btn btn-secondary" 
               style={{ 
                 padding: '6px 14px', 
@@ -242,10 +272,10 @@ export default function UsersPage() {
                 color: subTab === 'active' ? 'var(--accent-emerald)' : 'var(--text-muted)' 
               }}
             >
-              Active Users ({stats.activeUsers})
+              Active Users ({stats?.activeUsers || 0})
             </button>
             <button 
-              onClick={() => setSubTab('disabled')}
+              onClick={() => { setSubTab('disabled'); setSelectedStatus('disabled'); }}
               className="btn btn-secondary" 
               style={{ 
                 padding: '6px 14px', 
@@ -254,7 +284,7 @@ export default function UsersPage() {
                 color: subTab === 'disabled' ? 'var(--accent-rose)' : 'var(--text-muted)' 
               }}
             >
-              Disabled Users ({stats.disabledUsers})
+              Disabled Users ({stats?.disabledUsers || 0})
             </button>
           </div>
         </div>
@@ -404,7 +434,10 @@ export default function UsersPage() {
               className="input-field" 
               style={{ padding: '8px 12px', fontSize: '0.85rem', width: 'auto' }}
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setSubTab(e.target.value);
+              }}
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -537,8 +570,8 @@ export default function UsersPage() {
                     <td>{user.uptimeFormatted}</td>
 
                     <td>
-                      <span className={`badge badge-${user.statusColor}`}>
-                        {user.statusLabel}
+                      <span className={`badge badge-${user.statusColor || (user.disabled === 1 ? 'rose' : 'emerald')}`}>
+                        {user.statusLabel || (user.disabled === 1 ? 'Disabled' : 'Active')}
                       </span>
                     </td>
 
@@ -562,13 +595,13 @@ export default function UsersPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
           
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Showing <strong>{((pagination.page - 1) * pagination.limit) + (users.length > 0 ? 1 : 0)}</strong> to <strong>{((pagination.page - 1) * pagination.limit) + users.length}</strong> of <strong>{pagination.totalRecords.toLocaleString()}</strong> user entries
+            Showing <strong>{((((pagination?.page || 1) - 1) * (pagination?.limit || 25)) + (users.length > 0 ? 1 : 0)).toLocaleString()}</strong> to <strong>{((((pagination?.page || 1) - 1) * (pagination?.limit || 25)) + users.length).toLocaleString()}</strong> of <strong>{(pagination?.totalRecords ?? pagination?.total ?? 0).toLocaleString()}</strong> user entries
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               onClick={() => fetchUsers(1)}
-              disabled={!pagination.hasPrev}
+              disabled={!pagination?.hasPrev}
               className="btn btn-secondary"
               style={{ padding: '6px 10px' }}
               title="First Page"
@@ -577,8 +610,8 @@ export default function UsersPage() {
             </button>
 
             <button
-              onClick={() => fetchUsers(pagination.page - 1)}
-              disabled={!pagination.hasPrev}
+              onClick={() => fetchUsers((pagination?.page || 1) - 1)}
+              disabled={!pagination?.hasPrev}
               className="btn btn-secondary"
               style={{ padding: '6px 12px', fontSize: '0.85rem' }}
             >
@@ -587,12 +620,12 @@ export default function UsersPage() {
             </button>
 
             <div style={{ padding: '6px 12px', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-main)', background: 'var(--table-row-hover)', borderRadius: '6px' }}>
-              Page {pagination.page} of {pagination.totalPages}
+              Page {pagination?.page || 1} of {pagination?.totalPages || 1}
             </div>
 
             <button
-              onClick={() => fetchUsers(pagination.page + 1)}
-              disabled={!pagination.hasNext}
+              onClick={() => fetchUsers((pagination?.page || 1) + 1)}
+              disabled={!pagination?.hasNext}
               className="btn btn-secondary"
               style={{ padding: '6px 12px', fontSize: '0.85rem' }}
             >
@@ -601,8 +634,8 @@ export default function UsersPage() {
             </button>
 
             <button
-              onClick={() => fetchUsers(pagination.totalPages)}
-              disabled={!pagination.hasNext}
+              onClick={() => fetchUsers(pagination?.totalPages || 1)}
+              disabled={!pagination?.hasNext}
               className="btn btn-secondary"
               style={{ padding: '6px 10px' }}
               title="Last Page"
@@ -693,20 +726,20 @@ export default function UsersPage() {
               >
                 <Radio style={{ width: '15px', height: '15px' }} />
                 Sessions Log
-                {sessionsPagination.totalRecords > 0 && (
+                {(sessionsPagination?.totalRecords ?? sessionsPagination?.total ?? 0) > 0 && (
                   <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '0.7rem' }}>
-                    {sessionsPagination.totalRecords}
+                    {sessionsPagination?.totalRecords ?? sessionsPagination?.total ?? 0}
                   </span>
                 )}
               </button>
             </div>
 
             {/* TAB 1: Account Overview */}
-            {modalTab === 'details' && (
+            {modalTab === 'details' && selectedUserModal && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '0.88rem' }}>
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Username</div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.userName}</div>
+                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.userName || 'Unnamed'}</div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '12px' }}>
@@ -722,18 +755,18 @@ export default function UsersPage() {
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Status</div>
                   <div style={{ fontWeight: '700', color: selectedUserModal.disabled ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
-                    {selectedUserModal.statusLabel}
+                    {selectedUserModal.statusLabel || (selectedUserModal.disabled ? 'Disabled' : 'Active')}
                   </div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Download Used</div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.downloadFormatted}</div>
+                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.downloadFormatted || '0 B'}</div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Upload Used</div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.uploadFormatted}</div>
+                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.uploadFormatted || '0 B'}</div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '12px' }}>
@@ -743,7 +776,7 @@ export default function UsersPage() {
 
                 <div className="glass-card" style={{ padding: '12px' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Uptime Used</div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.uptimeFormatted}</div>
+                  <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedUserModal.uptimeFormatted || '0s'}</div>
                 </div>
               </div>
             )}
@@ -755,7 +788,7 @@ export default function UsersPage() {
                 {/* Session Filter Bar */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Total Recorded Sessions: <strong>{sessionsPagination.totalRecords.toLocaleString()}</strong>
+                    Total Recorded Sessions: <strong>{(sessionsPagination?.totalRecords ?? sessionsPagination?.total ?? 0).toLocaleString()}</strong>
                   </div>
 
                   <select
@@ -801,11 +834,11 @@ export default function UsersPage() {
                                 {sess.active ? 'Active' : 'Closed'}
                               </span>
                             </td>
-                            <td style={{ fontFamily: 'var(--font-mono)' }}>{sess.ipAddress}</td>
-                            <td style={{ fontFamily: 'var(--font-mono)' }}>{sess.macAddress}</td>
-                            <td>{sess.startTimeFormatted}</td>
-                            <td>{sess.durationFormatted}</td>
-                            <td style={{ fontWeight: '700' }}>{sess.totalTrafficFormatted}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{sess.ipAddress || 'N/A'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{sess.macAddress || 'N/A'}</td>
+                            <td>{sess.startTimeFormatted || 'N/A'}</td>
+                            <td>{sess.durationFormatted || '0s'}</td>
+                            <td style={{ fontWeight: '700' }}>{sess.totalTrafficFormatted || '0 B'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -814,16 +847,16 @@ export default function UsersPage() {
                 </div>
 
                 {/* Mini Pagination Footer */}
-                {sessionsPagination.totalPages > 1 && (
+                {(sessionsPagination?.totalPages || 1) > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                      Page {sessionsPagination.page} of {sessionsPagination.totalPages}
+                      Page {sessionsPagination?.page || 1} of {sessionsPagination?.totalPages || 1}
                     </div>
 
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
-                        onClick={() => fetchUserSessions(selectedUserModal.id, sessionsPagination.page - 1)}
-                        disabled={!sessionsPagination.hasPrev || sessionsLoading}
+                        onClick={() => fetchUserSessions(selectedUserModal?.id, (sessionsPagination?.page || 1) - 1)}
+                        disabled={!sessionsPagination?.hasPrev || sessionsLoading}
                         className="btn btn-secondary"
                         style={{ padding: '4px 10px', fontSize: '0.78rem' }}
                       >
@@ -832,8 +865,8 @@ export default function UsersPage() {
                       </button>
 
                       <button
-                        onClick={() => fetchUserSessions(selectedUserModal.id, sessionsPagination.page + 1)}
-                        disabled={!sessionsPagination.hasNext || sessionsLoading}
+                        onClick={() => fetchUserSessions(selectedUserModal?.id, (sessionsPagination?.page || 1) + 1)}
+                        disabled={!sessionsPagination?.hasNext || sessionsLoading}
                         className="btn btn-secondary"
                         style={{ padding: '4px 10px', fontSize: '0.78rem' }}
                       >
